@@ -25,7 +25,7 @@ def _int(name: str, default: int) -> int:
 @dataclass(frozen=True, slots=True)
 class Settings:
     environment: str = os.getenv("NODE_ENV", os.getenv("ENVIRONMENT", "development"))
-    host: str = "127.0.0.1"
+    host: str = os.getenv("HOST", "127.0.0.1")
     port: int = _int("PORT", 4000)
     app_url: str = os.getenv("APP_URL", "http://localhost:5173")
     frontend_origin: str = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")

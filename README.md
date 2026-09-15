@@ -18,6 +18,7 @@ A production-oriented, full-stack, multi-tenant **AI Receptionist & Appointment 
 - [Key Features](#key-features)
 - [Tech Stack](#tech-stack)
 - [Project Directory Structure](#project-directory-structure)
+- [Quick Start with Docker & n8n](#quick-start-with-docker--n8n)
 - [How to Run on Your Laptop (Local Setup)](#how-to-run-on-your-laptop-local-setup)
   - [1. Prerequisites](#1-prerequisites)
   - [2. Clone the Repository](#2-clone-the-repository)
@@ -134,6 +135,32 @@ appointment_assistant/
 ├── .env.example                # Template of required environment variables
 ├── package.json                # Root npm scripts orchestration
 └── README.md                   # Project documentation
+```
+
+---
+
+## Quick Start with Docker & n8n
+
+The quickest and most reliable way to run the complete environment (PostgreSQL, FastAPI Backend, React Frontend, and local self-hosted n8n) is using Docker Compose:
+
+```bash
+# 1. Run the all-in-one startup script
+./scripts/start-all.sh
+
+# Or start directly with Docker Compose
+docker compose up -d --build
+```
+
+The stack exposes:
+- **Frontend Dashboard**: [http://localhost:5173](http://localhost:5173) (Demo login: `owner@example.com` / `Password123!`)
+- **FastAPI Backend & Interactive API Docs**: [http://localhost:4000/docs](http://localhost:4000/docs)
+- **n8n Automation Studio**: [http://localhost:5678](http://localhost:5678)
+- **n8n Webhook Endpoint**: `http://localhost:5678/webhook/chat`
+- **PostgreSQL Database**: `localhost:5433` (DB: `apointment_assitant`, User: `postgres`)
+
+To stop all services:
+```bash
+./scripts/stop-all.sh
 ```
 
 ---
