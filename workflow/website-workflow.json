@@ -142,21 +142,21 @@
     },
     {
       "parameters": {
-        "model": "qwen/qwen3.6-27b",
+        "modelName": "models/gemini-2.5-flash",
         "options": {}
       },
-      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
       "typeVersion": 1,
       "position": [
         1376,
         560
       ],
       "id": "31d148ab-5558-4746-a172-b0cc79c85d74",
-      "name": "Groq Chat Model1",
+      "name": "Google Gemini Chat Model",
       "credentials": {
-        "groqApi": {
-          "id": "Groq API",
-          "name": "Groq API"
+        "googlePalmApi": {
+          "id": "gGeminiApiUmair1",
+          "name": "Google Gemini API Account"
         }
       }
     },
@@ -759,7 +759,7 @@
         []
       ]
     },
-    "Groq Chat Model1": {
+    "Google Gemini Chat Model": {
       "ai_languageModel": [
         [
           {

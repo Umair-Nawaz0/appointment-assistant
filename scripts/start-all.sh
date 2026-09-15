@@ -75,10 +75,10 @@ if [ -n "${n8n_container}" ]; then
   if [ "${n8n_ready}" -eq 1 ]; then
     echo "✓ n8n engine is ready!"
 
-    # Import Groq credential template if available
-    if [ -f "${PROJECT_DIR}/credentials/groq-api.json" ]; then
-      docker exec "${n8n_container}" n8n import:credentials --input=/bootstrap/credentials/groq-api.json >/dev/null 2>&1 || true
-      echo "✓ Imported Groq API credential template into n8n"
+    # Import Google Gemini credential template if available
+    if [ -f "${PROJECT_DIR}/credentials/google-gemini-api.json" ]; then
+      docker exec "${n8n_container}" n8n import:credentials --input=/bootstrap/credentials/google-gemini-api.json >/dev/null 2>&1 || true
+      echo "✓ Imported Google Gemini API credential template into n8n"
     fi
 
     # Import website workflow (ensuring valid n8n entity ID inside container without modifying host source file)
