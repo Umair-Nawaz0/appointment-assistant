@@ -1,0 +1,261 @@
+digraph ERD {
+    graph [
+        rankdir=TB,
+        bgcolor="#0f172a",
+        fontname="Helvetica Neue, Helvetica, Arial, sans-serif",
+        fontsize=12,
+        nodesep=0.7,
+        ranksep=0.9,
+        pad="0.5",
+        compound=true,
+        splines=ortho
+    ];
+
+    node [
+        shape=none,
+        fontname="Helvetica Neue, Helvetica, Arial, sans-serif",
+        fontsize=10,
+        color="#334155"
+    ];
+
+    edge [
+        fontname="Helvetica Neue, Helvetica, Arial, sans-serif",
+        fontsize=9,
+        color="#94a3b8",
+        fontcolor="#cbd5e1",
+        arrowsize=0.8
+    ];
+
+    // Header title
+    title [
+        label=<
+            <table border="0" cellborder="0" cellspacing="0" cellpadding="8">
+                <tr><td align="center"><b><font color="#f8fafc" point-size="20">AI APPOINTMENT ASSISTANT &mdash; DATA MODEL</font></b></td></tr>
+                <tr><td align="center"><font color="#94a3b8" point-size="11">11 TABLES &bull; MULTI-TENANT TENANT ISOLATION &bull; DIRECT AUTH &bull; SINGLE WEB AI ASSISTANT</font></td></tr>
+            </table>
+        >
+    ];
+
+    // Businesses
+    businesses [
+        label=<
+            <table border="1" cellborder="0" cellspacing="0" cellpadding="4" bgcolor="#1e293b" style="rounded">
+                <tr><td colspan="3" bgcolor="#3b82f6" align="center"><b><font color="#ffffff" point-size="12">businesses</font></b></td></tr>
+                <tr><td align="left"><font color="#f59e0b"><b>PK</b></font></td><td align="left"><b><font color="#f8fafc">id</font></b></td><td align="right"><font color="#94a3b8">uuid</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">name</font></td><td align="right"><font color="#94a3b8">text</font></td></tr>
+                <tr><td align="left"><font color="#10b981"><b>UQ</b></font></td><td align="left"><b><font color="#f8fafc">email</font></b></td><td align="right"><font color="#94a3b8">text</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">password_hash</font></td><td align="right"><font color="#94a3b8">text</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">address</font></td><td align="right"><font color="#64748b">text NULL</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">city</font></td><td align="right"><font color="#64748b">text NULL</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">state_province</font></td><td align="right"><font color="#64748b">text NULL</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">postal_code</font></td><td align="right"><font color="#64748b">text NULL</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">country_code</font></td><td align="right"><font color="#64748b">char(2) NULL</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">industry</font></td><td align="right"><font color="#64748b">text NULL</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">timezone</font></td><td align="right"><font color="#94a3b8">text</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">status</font></td><td align="right"><font color="#94a3b8">business_status</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">email_verified_at</font></td><td align="right"><font color="#64748b">timestamptz NULL</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">last_login_at</font></td><td align="right"><font color="#64748b">timestamptz NULL</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">created_at</font></td><td align="right"><font color="#94a3b8">timestamptz</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">updated_at</font></td><td align="right"><font color="#94a3b8">timestamptz</font></td></tr>
+            </table>
+        >
+    ];
+
+    // Business Settings
+    business_settings [
+        label=<
+            <table border="1" cellborder="0" cellspacing="0" cellpadding="4" bgcolor="#1e293b" style="rounded">
+                <tr><td colspan="3" bgcolor="#6366f1" align="center"><b><font color="#ffffff" point-size="12">business_settings</font></b></td></tr>
+                <tr><td align="left"><font color="#f59e0b"><b>PK</b></font> <font color="#06b6d4"><b>FK</b></font></td><td align="left"><b><font color="#f8fafc">business_id</font></b></td><td align="right"><font color="#94a3b8">uuid</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">appointment_duration_minutes</font></td><td align="right"><font color="#94a3b8">integer</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">booking_window_days</font></td><td align="right"><font color="#94a3b8">integer</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">maximum_appointments_per_day</font></td><td align="right"><font color="#64748b">integer NULL</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">allow_cancellation</font></td><td align="right"><font color="#94a3b8">boolean</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">allow_reschedule</font></td><td align="right"><font color="#94a3b8">boolean</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">collect_phone</font></td><td align="right"><font color="#94a3b8">boolean</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">collect_email</font></td><td align="right"><font color="#94a3b8">boolean</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">confirmation_required</font></td><td align="right"><font color="#94a3b8">boolean</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">created_at</font></td><td align="right"><font color="#94a3b8">timestamptz</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">updated_at</font></td><td align="right"><font color="#94a3b8">timestamptz</font></td></tr>
+            </table>
+        >
+    ];
+
+    // Business Hours
+    business_hours [
+        label=<
+            <table border="1" cellborder="0" cellspacing="0" cellpadding="4" bgcolor="#1e293b" style="rounded">
+                <tr><td colspan="3" bgcolor="#6366f1" align="center"><b><font color="#ffffff" point-size="12">business_hours</font></b></td></tr>
+                <tr><td align="left"><font color="#f59e0b"><b>PK</b></font> <font color="#06b6d4"><b>FK</b></font></td><td align="left"><b><font color="#f8fafc">business_id</font></b></td><td align="right"><font color="#94a3b8">uuid</font></td></tr>
+                <tr><td align="left"><font color="#f59e0b"><b>PK</b></font></td><td align="left"><b><font color="#f8fafc">day_of_week</font></b></td><td align="right"><font color="#94a3b8">day_of_week</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">opens_at</font></td><td align="right"><font color="#94a3b8">time</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">closes_at</font></td><td align="right"><font color="#94a3b8">time</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">created_at</font></td><td align="right"><font color="#94a3b8">timestamptz</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">updated_at</font></td><td align="right"><font color="#94a3b8">timestamptz</font></td></tr>
+            </table>
+        >
+    ];
+
+    // Business Schedule Overrides
+    business_schedule_overrides [
+        label=<
+            <table border="1" cellborder="0" cellspacing="0" cellpadding="4" bgcolor="#1e293b" style="rounded">
+                <tr><td colspan="3" bgcolor="#6366f1" align="center"><b><font color="#ffffff" point-size="12">business_schedule_overrides</font></b></td></tr>
+                <tr><td align="left"><font color="#f59e0b"><b>PK</b></font> <font color="#06b6d4"><b>FK</b></font></td><td align="left"><b><font color="#f8fafc">business_id</font></b></td><td align="right"><font color="#94a3b8">uuid</font></td></tr>
+                <tr><td align="left"><font color="#f59e0b"><b>PK</b></font></td><td align="left"><b><font color="#f8fafc">override_date</font></b></td><td align="right"><font color="#94a3b8">date</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">is_closed</font></td><td align="right"><font color="#94a3b8">boolean</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">opens_at</font></td><td align="right"><font color="#64748b">time NULL</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">closes_at</font></td><td align="right"><font color="#64748b">time NULL</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">reason</font></td><td align="right"><font color="#64748b">text NULL</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">created_at</font></td><td align="right"><font color="#94a3b8">timestamptz</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">updated_at</font></td><td align="right"><font color="#94a3b8">timestamptz</font></td></tr>
+            </table>
+        >
+    ];
+
+    // Auth Codes
+    business_auth_codes [
+        label=<
+            <table border="1" cellborder="0" cellspacing="0" cellpadding="4" bgcolor="#1e293b" style="rounded">
+                <tr><td colspan="3" bgcolor="#64748b" align="center"><b><font color="#ffffff" point-size="12">business_auth_codes</font></b></td></tr>
+                <tr><td align="left"><font color="#f59e0b"><b>PK</b></font></td><td align="left"><b><font color="#f8fafc">id</font></b></td><td align="right"><font color="#94a3b8">uuid</font></td></tr>
+                <tr><td align="left"><font color="#06b6d4"><b>FK</b></font></td><td align="left"><font color="#f8fafc">business_id</font></td><td align="right"><font color="#94a3b8">uuid</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">code_type</font></td><td align="right"><font color="#94a3b8">code_type</font></td></tr>
+                <tr><td align="left"><font color="#10b981"><b>UQ</b></font></td><td align="left"><b><font color="#f8fafc">code_hash</font></b></td><td align="right"><font color="#94a3b8">char(64)</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">expires_at</font></td><td align="right"><font color="#94a3b8">timestamptz</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">consumed_at</font></td><td align="right"><font color="#64748b">timestamptz NULL</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">attempt_count</font></td><td align="right"><font color="#94a3b8">smallint</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">created_at</font></td><td align="right"><font color="#94a3b8">timestamptz</font></td></tr>
+            </table>
+        >
+    ];
+
+    // Business Sessions
+    business_sessions [
+        label=<
+            <table border="1" cellborder="0" cellspacing="0" cellpadding="4" bgcolor="#1e293b" style="rounded">
+                <tr><td colspan="3" bgcolor="#64748b" align="center"><b><font color="#ffffff" point-size="12">business_sessions</font></b></td></tr>
+                <tr><td align="left"><font color="#f59e0b"><b>PK</b></font></td><td align="left"><b><font color="#f8fafc">id</font></b></td><td align="right"><font color="#94a3b8">uuid</font></td></tr>
+                <tr><td align="left"><font color="#06b6d4"><b>FK</b></font></td><td align="left"><font color="#f8fafc">business_id</font></td><td align="right"><font color="#94a3b8">uuid</font></td></tr>
+                <tr><td align="left"><font color="#10b981"><b>UQ</b></font></td><td align="left"><b><font color="#f8fafc">token_hash</font></b></td><td align="right"><font color="#94a3b8">char(64)</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">expires_at</font></td><td align="right"><font color="#94a3b8">timestamptz</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">last_seen_at</font></td><td align="right"><font color="#94a3b8">timestamptz</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">revoked_at</font></td><td align="right"><font color="#64748b">timestamptz NULL</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">created_at</font></td><td align="right"><font color="#94a3b8">timestamptz</font></td></tr>
+            </table>
+        >
+    ];
+
+    // Customers
+    customers [
+        label=<
+            <table border="1" cellborder="0" cellspacing="0" cellpadding="4" bgcolor="#1e293b" style="rounded">
+                <tr><td colspan="3" bgcolor="#10b981" align="center"><b><font color="#ffffff" point-size="12">customers</font></b></td></tr>
+                <tr><td align="left"><font color="#f59e0b"><b>PK</b></font></td><td align="left"><b><font color="#f8fafc">id</font></b></td><td align="right"><font color="#94a3b8">uuid</font></td></tr>
+                <tr><td align="left"><font color="#06b6d4"><b>FK</b></font></td><td align="left"><b><font color="#f8fafc">business_id</font></b></td><td align="right"><font color="#94a3b8">uuid</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">name</font></td><td align="right"><font color="#64748b">text NULL</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">phone</font></td><td align="right"><font color="#64748b">text NULL</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">email</font></td><td align="right"><font color="#64748b">text NULL</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">created_at</font></td><td align="right"><font color="#94a3b8">timestamptz</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">updated_at</font></td><td align="right"><font color="#94a3b8">timestamptz</font></td></tr>
+            </table>
+        >
+    ];
+
+    // Conversations
+    conversations [
+        label=<
+            <table border="1" cellborder="0" cellspacing="0" cellpadding="4" bgcolor="#1e293b" style="rounded">
+                <tr><td colspan="3" bgcolor="#8b5cf6" align="center"><b><font color="#ffffff" point-size="12">conversations</font></b></td></tr>
+                <tr><td align="left"><font color="#f59e0b"><b>PK</b></font></td><td align="left"><b><font color="#f8fafc">id</font></b></td><td align="right"><font color="#94a3b8">uuid</font></td></tr>
+                <tr><td align="left"><font color="#06b6d4"><b>FK</b></font></td><td align="left"><b><font color="#f8fafc">business_id</font></b></td><td align="right"><font color="#94a3b8">uuid</font></td></tr>
+                <tr><td align="left"><font color="#06b6d4"><b>FK</b></font></td><td align="left"><font color="#f8fafc">customer_id</font></td><td align="right"><font color="#64748b">uuid NULL (Anonymous)</font></td></tr>
+                <tr><td align="left"><font color="#10b981"><b>UQ</b></font></td><td align="left"><font color="#f8fafc">external_conversation_id</font></td><td align="right"><font color="#64748b">text NULL</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">status</font></td><td align="right"><font color="#94a3b8">conversation_status</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">started_at</font></td><td align="right"><font color="#94a3b8">timestamptz</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">last_message_at</font></td><td align="right"><font color="#64748b">timestamptz NULL</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">closed_at</font></td><td align="right"><font color="#64748b">timestamptz NULL</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">created_at</font></td><td align="right"><font color="#94a3b8">timestamptz</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">updated_at</font></td><td align="right"><font color="#94a3b8">timestamptz</font></td></tr>
+            </table>
+        >
+    ];
+
+    // Conversation Messages
+    conversation_messages [
+        label=<
+            <table border="1" cellborder="0" cellspacing="0" cellpadding="4" bgcolor="#1e293b" style="rounded">
+                <tr><td colspan="3" bgcolor="#8b5cf6" align="center"><b><font color="#ffffff" point-size="12">conversation_messages</font></b></td></tr>
+                <tr><td align="left"><font color="#f59e0b"><b>PK</b></font></td><td align="left"><b><font color="#f8fafc">id</font></b></td><td align="right"><font color="#94a3b8">uuid</font></td></tr>
+                <tr><td align="left"><font color="#06b6d4"><b>FK</b></font></td><td align="left"><b><font color="#f8fafc">business_id</font></b></td><td align="right"><font color="#94a3b8">uuid</font></td></tr>
+                <tr><td align="left"><font color="#06b6d4"><b>FK</b></font></td><td align="left"><b><font color="#f8fafc">conversation_id</font></b></td><td align="right"><font color="#94a3b8">uuid</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">sender</font></td><td align="right"><font color="#94a3b8">message_sender</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">message_type</font></td><td align="right"><font color="#94a3b8">message_type</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">content</font></td><td align="right"><font color="#64748b">text NULL</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">media_url</font></td><td align="right"><font color="#64748b">text NULL</font></td></tr>
+                <tr><td align="left"><font color="#10b981"><b>UQ</b></font></td><td align="left"><font color="#f8fafc">external_message_id</font></td><td align="right"><font color="#64748b">text NULL</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">metadata</font></td><td align="right"><font color="#94a3b8">jsonb</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">sent_at</font></td><td align="right"><font color="#94a3b8">timestamptz</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">created_at</font></td><td align="right"><font color="#94a3b8">timestamptz</font></td></tr>
+            </table>
+        >
+    ];
+
+    // Conversation State
+    conversation_state [
+        label=<
+            <table border="1" cellborder="0" cellspacing="0" cellpadding="4" bgcolor="#1e293b" style="rounded">
+                <tr><td colspan="3" bgcolor="#8b5cf6" align="center"><b><font color="#ffffff" point-size="12">conversation_state</font></b></td></tr>
+                <tr><td align="left"><font color="#f59e0b"><b>PK</b></font> <font color="#06b6d4"><b>FK</b></font></td><td align="left"><b><font color="#f8fafc">conversation_id</font></b></td><td align="right"><font color="#94a3b8">uuid</font></td></tr>
+                <tr><td align="left"><font color="#06b6d4"><b>FK</b></font></td><td align="left"><b><font color="#f8fafc">business_id</font></b></td><td align="right"><font color="#94a3b8">uuid</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">current_intent</font></td><td align="right"><font color="#64748b">text NULL</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">current_step</font></td><td align="right"><font color="#64748b">text NULL</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">collected_data</font></td><td align="right"><font color="#94a3b8">jsonb</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">context_summary</font></td><td align="right"><font color="#64748b">text NULL</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">last_ai_response</font></td><td align="right"><font color="#64748b">text NULL</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">created_at</font></td><td align="right"><font color="#94a3b8">timestamptz</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">updated_at</font></td><td align="right"><font color="#94a3b8">timestamptz</font></td></tr>
+            </table>
+        >
+    ];
+
+    // Appointments
+    appointments [
+        label=<
+            <table border="1" cellborder="0" cellspacing="0" cellpadding="4" bgcolor="#1e293b" style="rounded">
+                <tr><td colspan="3" bgcolor="#ec4899" align="center"><b><font color="#ffffff" point-size="12">appointments</font></b></td></tr>
+                <tr><td align="left"><font color="#f59e0b"><b>PK</b></font></td><td align="left"><b><font color="#f8fafc">id</font></b></td><td align="right"><font color="#94a3b8">uuid</font></td></tr>
+                <tr><td align="left"><font color="#06b6d4"><b>FK</b></font></td><td align="left"><b><font color="#f8fafc">business_id</font></b></td><td align="right"><font color="#94a3b8">uuid</font></td></tr>
+                <tr><td align="left"><font color="#06b6d4"><b>FK</b></font></td><td align="left"><b><font color="#f8fafc">customer_id</font></b></td><td align="right"><font color="#94a3b8">uuid</font></td></tr>
+                <tr><td align="left"><font color="#06b6d4"><b>FK</b></font></td><td align="left"><font color="#f8fafc">conversation_id</font></td><td align="right"><font color="#64748b">uuid NULL</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">status</font></td><td align="right"><font color="#94a3b8">appointment_status</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">scheduled_start</font></td><td align="right"><font color="#94a3b8">timestamptz</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">scheduled_end</font></td><td align="right"><font color="#94a3b8">timestamptz</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">customer_name</font></td><td align="right"><font color="#64748b">text NULL</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">customer_phone</font></td><td align="right"><font color="#64748b">text NULL</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">customer_email</font></td><td align="right"><font color="#64748b">text NULL</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">created_at</font></td><td align="right"><font color="#94a3b8">timestamptz</font></td></tr>
+                <tr><td align="left"></td><td align="left"><font color="#f8fafc">updated_at</font></td><td align="right"><font color="#94a3b8">timestamptz</font></td></tr>
+            </table>
+        >
+    ];
+
+    // Relationships
+    title -> businesses [style=invis];
+
+    businesses -> business_settings [label="1 : 1", color="#38bdf8"];
+    businesses -> business_hours [label="1 : 0..7", color="#38bdf8"];
+    businesses -> business_schedule_overrides [label="1 : many", color="#38bdf8"];
+    businesses -> business_auth_codes [label="1 : many", color="#94a3b8"];
+    businesses -> business_sessions [label="1 : many", color="#94a3b8"];
+    businesses -> customers [label="1 : many", color="#34d399"];
+    businesses -> conversations [label="1 : many", color="#a78bfa"];
+    businesses -> appointments [label="1 : many", color="#f472b6"];
+
+    customers -> conversations [label="0..1 : many\n(nullable customer_id)", color="#34d399", style=dashed];
+    customers -> appointments [label="1 : many\n(booking created)", color="#34d399"];
+
+    conversations -> conversation_messages [label="1 : many\n(ordered timeline)", color="#a78bfa"];
+    conversations -> conversation_state [label="open 1 : 1\n(closed 1 : 0)", color="#a78bfa"];
+    conversations -> appointments [label="0..1 : many\n(optional booking ref)", color="#f472b6", style=dashed];
+}

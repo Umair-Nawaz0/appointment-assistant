@@ -1,12 +1,3 @@
-CREATE TYPE channel_type AS ENUM (
-    'WHATSAPP',
-    'PHONE',
-    'SMS',
-    'EMAIL',
-    'INSTAGRAM',
-    'WEBSITE'
-);
-
 CREATE TYPE business_status AS ENUM (
     'ACTIVE',
     'INACTIVE',
@@ -55,7 +46,5 @@ CREATE TYPE message_type AS ENUM (
     'IMAGE',
     'AUDIO',
     'VIDEO',
-    'DOCUMENT',
-    'EMAIL',
-    'CALL_TRANSCRIPT'
+    'DOCUMENT'
 );

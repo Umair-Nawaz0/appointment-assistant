@@ -68,7 +68,6 @@ async def test_authentication_and_tenant_apis(client: httpx.AsyncClient):
 
     business = await client.get("/api/business")
     assert business.status_code == 200
-    profile = business.json()["business"]
     updated_business = await client.put("/api/business", json={
         "name": "FastAPI Test Studio", "address": "123 Test Street", "city": "Lahore",
         "stateProvince": "Punjab", "postalCode": "54000", "countryCode": "pk",
@@ -95,34 +94,43 @@ async def test_authentication_and_tenant_apis(client: httpx.AsyncClient):
         "isClosed": False, "opensAt": "11:00", "closesAt": "15:00", "reason": "Special hours",
     })
     assert special.status_code == 200, special.text
-    channels = await client.get("/api/business/channels")
-    assert channels.status_code == 200 and len(channels.json()["channels"]) == 6
-    website = await client.put("/api/business/channels/WEBSITE", json={
-        "enabled": True, "provider": "internal", "externalAccountId": f"fastapi-{time.time_ns()}", "metadata": {"source": "test"},
-    })
-    assert website.status_code == 200, website.text
 
+    # Anonymous conversation without customer
+    anon_conv = await client.post("/api/conversations", json={
+        "externalConversationId": "visitor-session-123",
+        "currentIntent": "GREETING",
+    })
+    assert anon_conv.status_code == 201, anon_conv.text
+    anon_conv_id = anon_conv.json()["conversation"]["id"]
+    anon_detail = await client.get(f"/api/conversations/{anon_conv_id}")
+    assert anon_detail.status_code == 200
+    assert anon_detail.json()["conversation"]["customerId"] is None
+
+    # Customer enters booking flow -> create customer with contact info
     customer = await client.post("/api/customers", json={
         "name": "Ada Customer",
-        "identities": [{"channel": "EMAIL", "identifier": "ada@example.com", "isPrimary": True}],
+        "phone": "+15551234567",
+        "email": "ada@example.com",
     })
     assert customer.status_code == 201, customer.text
     customer_id = customer.json()["customer"]["id"]
     customer_detail = await client.get(f"/api/customers/{customer_id}")
     assert customer_detail.status_code == 200
+    assert customer_detail.json()["customer"]["email"] == "ada@example.com"
     renamed = await client.patch(f"/api/customers/{customer_id}", json={"name": "Ada Updated"})
     assert renamed.status_code == 200, renamed.text
-    phone = await client.post(f"/api/customers/{customer_id}/identities", json={
-        "channel": "PHONE", "identifier": "+15551234567", "isPrimary": True,
-    })
-    assert phone.status_code == 201, phone.text
-    phone_id = phone.json()["identity"]["id"]
-    assert (await client.delete(f"/api/customers/{customer_id}/identities/{phone_id}")).status_code == 204
+    assert renamed.json()["customer"]["name"] == "Ada Updated"
+
+    # Associate anonymous conversation with customer and book appointment
+    associate = await client.patch(f"/api/conversations/{anon_conv_id}", json={"customerId": customer_id})
+    assert associate.status_code == 200, associate.text
+    assert associate.json()["conversation"]["customerId"] == customer_id
+    conversation_id = anon_conv_id
 
     appointment = await client.post("/api/appointments", json={
         "customerId": customer_id,
+        "conversationId": conversation_id,
         "scheduledStart": (datetime.now(timezone.utc) + timedelta(days=2)).isoformat(),
-        "createdChannel": "WEBSITE",
     })
     assert appointment.status_code == 201, appointment.text
     assert appointment.json()["appointment"]["customerEmail"] == "ada@example.com"
@@ -132,12 +140,7 @@ async def test_authentication_and_tenant_apis(client: httpx.AsyncClient):
     confirmed = await client.patch(f"/api/appointments/{appointment_id}", json={"status": "CONFIRMED"})
     assert confirmed.status_code == 200, confirmed.text
 
-    conversation = await client.post("/api/conversations", json={
-        "customerId": customer_id, "channel": "WEBSITE", "currentIntent": "BOOK_APPOINTMENT",
-    })
-    assert conversation.status_code == 201, conversation.text
-    conversation_id = conversation.json()["conversation"]["id"]
-    message = await client.post(f"/api/conversations/{conversation_id}/messages", json={"content": "Hello from FastAPI"})
+    message = await client.post(f"/api/conversations/{conversation_id}/messages", json={"content": "Hello from website AI assistant"})
     assert message.status_code == 201, message.text
     detail = await client.get(f"/api/conversations/{conversation_id}")
     assert detail.status_code == 200 and len(detail.json()["messages"]) == 1

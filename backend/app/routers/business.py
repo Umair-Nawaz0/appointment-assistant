@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends
 
 from ..db import execute, fetch, fetchrow, transaction
 from ..dependencies import AuthBusiness, current_business
-from ..schemas import BusinessUpdate, Channel, ChannelUpdate, HoursUpdate, OverrideUpdate, SettingsUpdate
+from ..schemas import BusinessUpdate, HoursUpdate, OverrideUpdate, SettingsUpdate
 
 router = APIRouter(prefix="/api/business", tags=["Business"])
 
@@ -113,23 +113,3 @@ async def put_override(override_date: date, payload: OverrideUpdate, user: AuthB
 @router.delete("/overrides/{override_date}", status_code=204)
 async def delete_override(override_date: date, user: AuthBusiness = Depends(current_business)) -> None:
     await execute("DELETE FROM business_schedule_overrides WHERE business_id=$1 AND override_date=$2", user.business_id, override_date)
-
-
-@router.get("/channels")
-async def get_channels(user: AuthBusiness = Depends(current_business)) -> dict[str, object]:
-    rows = await fetch(
-        """SELECT channel::text,enabled,provider,external_account_id AS "externalAccountId",metadata
-             FROM business_channels WHERE business_id=$1 ORDER BY channel""", user.business_id,
-    )
-    return {"channels": [dict(row) for row in rows]}
-
-
-@router.put("/channels/{channel}")
-async def update_channel(channel: Channel, payload: ChannelUpdate, user: AuthBusiness = Depends(current_business)) -> dict[str, object]:
-    row = await fetchrow(
-        """UPDATE business_channels SET enabled=$1,provider=$2,external_account_id=$3,metadata=$4
-             WHERE business_id=$5 AND channel=$6
-             RETURNING channel::text,enabled,provider,external_account_id AS "externalAccountId",metadata""",
-        payload.enabled, payload.provider, payload.externalAccountId, payload.metadata, user.business_id, channel.value,
-    )
-    return {"channel": dict(row)}

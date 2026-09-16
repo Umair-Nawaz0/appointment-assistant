@@ -61,26 +61,24 @@ ALTER TABLE ONLY business_schedule_overrides
         reason IS NULL OR btrim(reason) <> ''::text
     );
 
-ALTER TABLE ONLY business_channels
-    ADD CONSTRAINT pk_business_channels PRIMARY KEY (business_id, channel),
-    ADD CONSTRAINT ck_business_channels_provider CHECK (
-        provider IS NULL OR btrim(provider) <> ''::text
-    ),
-    ADD CONSTRAINT ck_business_channels_external_account CHECK (
-        external_account_id IS NULL OR btrim(external_account_id) <> ''::text
-    ),
-    ADD CONSTRAINT ck_business_channels_external_provider CHECK (
-        external_account_id IS NULL OR provider IS NOT NULL
-    ),
-    ADD CONSTRAINT ck_business_channels_metadata_object CHECK (
-        jsonb_typeof(metadata) = 'object'::text
-    );
-
 ALTER TABLE ONLY customers
     ADD CONSTRAINT pk_customers PRIMARY KEY (id),
     ADD CONSTRAINT uq_customers_business_id_id UNIQUE (business_id, id),
     ADD CONSTRAINT ck_customers_name_nonempty CHECK (
         name IS NULL OR btrim(name) <> ''::text
+    ),
+    ADD CONSTRAINT ck_customers_email CHECK (
+        email IS NULL OR (
+            email = lower(btrim(email))
+            AND email LIKE '%_@_%._%'
+            AND email !~ '[[:space:]]'::text
+        )
+    ),
+    ADD CONSTRAINT ck_customers_phone_nonempty CHECK (
+        phone IS NULL OR btrim(phone) <> ''::text
+    ),
+    ADD CONSTRAINT ck_customers_contact_info CHECK (
+        name IS NOT NULL OR phone IS NOT NULL OR email IS NOT NULL
     );
 
 ALTER TABLE ONLY business_auth_codes
@@ -107,15 +105,6 @@ ALTER TABLE ONLY business_sessions
         revoked_at IS NULL OR revoked_at >= created_at
     );
 
-ALTER TABLE ONLY customer_identities
-    ADD CONSTRAINT pk_customer_identities PRIMARY KEY (id),
-    ADD CONSTRAINT ck_customer_identities_identifier CHECK (
-        identifier = btrim(identifier) AND identifier <> ''::text
-    ),
-    ADD CONSTRAINT ck_customer_identities_display_name CHECK (
-        display_name IS NULL OR btrim(display_name) <> ''::text
-    );
-
 ALTER TABLE ONLY conversations
     ADD CONSTRAINT pk_conversations PRIMARY KEY (id),
     ADD CONSTRAINT uq_conversations_business_id_id UNIQUE (business_id, id),
@@ -137,9 +126,7 @@ ALTER TABLE ONLY conversation_messages
     ADD CONSTRAINT pk_conversation_messages PRIMARY KEY (id),
     ADD CONSTRAINT ck_conversation_messages_content CHECK (
         CASE
-            WHEN message_type = ANY (
-                ARRAY['TEXT'::message_type, 'EMAIL'::message_type, 'CALL_TRANSCRIPT'::message_type]
-            ) THEN content IS NOT NULL AND btrim(content) <> ''::text
+            WHEN message_type = 'TEXT'::message_type THEN content IS NOT NULL AND btrim(content) <> ''::text
             ELSE
                 (content IS NOT NULL AND btrim(content) <> ''::text)
                 OR (media_url IS NOT NULL AND btrim(media_url) <> ''::text)
@@ -177,7 +164,11 @@ ALTER TABLE ONLY appointments
         customer_phone IS NULL OR btrim(customer_phone) <> ''::text
     ),
     ADD CONSTRAINT ck_appointments_customer_email CHECK (
-        customer_email IS NULL OR btrim(customer_email) <> ''::text
+        customer_email IS NULL OR (
+            customer_email = lower(btrim(customer_email))
+            AND customer_email LIKE '%_@_%._%'
+            AND customer_email !~ '[[:space:]]'::text
+        )
     );
 
 ALTER TABLE ONLY business_settings
@@ -192,10 +183,6 @@ ALTER TABLE ONLY business_schedule_overrides
     ADD CONSTRAINT fk_business_schedule_overrides_business FOREIGN KEY (business_id)
         REFERENCES businesses(id) ON UPDATE NO ACTION ON DELETE CASCADE;
 
-ALTER TABLE ONLY business_channels
-    ADD CONSTRAINT fk_business_channels_business FOREIGN KEY (business_id)
-        REFERENCES businesses(id) ON UPDATE NO ACTION ON DELETE CASCADE;
-
 ALTER TABLE ONLY customers
     ADD CONSTRAINT fk_customers_business FOREIGN KEY (business_id)
         REFERENCES businesses(id) ON UPDATE NO ACTION ON DELETE CASCADE;
@@ -208,18 +195,11 @@ ALTER TABLE ONLY business_sessions
     ADD CONSTRAINT fk_business_sessions_business FOREIGN KEY (business_id)
         REFERENCES businesses(id) ON UPDATE NO ACTION ON DELETE CASCADE;
 
-ALTER TABLE ONLY customer_identities
-    ADD CONSTRAINT fk_customer_identities_customer FOREIGN KEY (business_id, customer_id)
-        REFERENCES customers(business_id, id) ON UPDATE NO ACTION ON DELETE CASCADE;
-
 ALTER TABLE ONLY conversations
     ADD CONSTRAINT fk_conversations_business FOREIGN KEY (business_id)
         REFERENCES businesses(id) ON UPDATE NO ACTION ON DELETE CASCADE,
     ADD CONSTRAINT fk_conversations_customer FOREIGN KEY (business_id, customer_id)
-        REFERENCES customers(business_id, id) ON UPDATE NO ACTION ON DELETE CASCADE,
-    ADD CONSTRAINT fk_conversations_business_channel FOREIGN KEY (business_id, channel)
-        REFERENCES business_channels(business_id, channel)
-        ON UPDATE NO ACTION ON DELETE NO ACTION DEFERRABLE INITIALLY DEFERRED;
+        REFERENCES customers(business_id, id) ON UPDATE NO ACTION ON DELETE SET NULL (customer_id);
 
 ALTER TABLE ONLY conversation_messages
     ADD CONSTRAINT fk_conversation_messages_conversation FOREIGN KEY (business_id, conversation_id)

@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict 0VdbGomXScgXZN0PMQSvlr7bss0sKZNpazzqGx7yxwOSIu2ll84fGAeFfWhZL7R
+\restrict aUoxsmhF5jEPIIhqX3DoWlF4CQQrffsONpsQbRozgMdKhugzDJYkYEVkvIvtrah
 
--- Dumped from database version 18.4 (Ubuntu 18.4-0ubuntu0.26.04.1)
--- Dumped by pg_dump version 18.4 (Ubuntu 18.4-0ubuntu0.26.04.1)
+-- Dumped from database version 18.6 (Ubuntu 18.6-0ubuntu0.26.04.1)
+-- Dumped by pg_dump version 18.6 (Ubuntu 18.6-0ubuntu0.26.04.1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -68,20 +68,6 @@ CREATE TYPE public.business_status AS ENUM (
 
 
 --
--- Name: channel_type; Type: TYPE; Schema: public; Owner: -
---
-
-CREATE TYPE public.channel_type AS ENUM (
-    'WHATSAPP',
-    'PHONE',
-    'SMS',
-    'EMAIL',
-    'INSTAGRAM',
-    'WEBSITE'
-);
-
-
---
 -- Name: conversation_status; Type: TYPE; Schema: public; Owner: -
 --
 
@@ -129,9 +115,7 @@ CREATE TYPE public.message_type AS ENUM (
     'IMAGE',
     'AUDIO',
     'VIDEO',
-    'DOCUMENT',
-    'EMAIL',
-    'CALL_TRANSCRIPT'
+    'DOCUMENT'
 );
 
 
@@ -339,13 +323,12 @@ CREATE TABLE public.appointments (
     status public.appointment_status DEFAULT 'PENDING'::public.appointment_status NOT NULL,
     scheduled_start timestamp with time zone NOT NULL,
     scheduled_end timestamp with time zone NOT NULL,
-    created_channel public.channel_type NOT NULL,
     customer_name text,
     customer_phone text,
     customer_email text,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    CONSTRAINT ck_appointments_customer_email CHECK (((customer_email IS NULL) OR (btrim(customer_email) <> ''::text))),
+    CONSTRAINT ck_appointments_customer_email CHECK (((customer_email IS NULL) OR ((customer_email = lower(btrim(customer_email))) AND (customer_email ~~ '%_@_%._%'::text) AND (customer_email !~ '[[:space:]]'::text)))),
     CONSTRAINT ck_appointments_customer_name CHECK (((customer_name IS NULL) OR (btrim(customer_name) <> ''::text))),
     CONSTRAINT ck_appointments_customer_phone CHECK (((customer_phone IS NULL) OR (btrim(customer_phone) <> ''::text))),
     CONSTRAINT ck_appointments_schedule CHECK ((scheduled_end > scheduled_start))
@@ -356,7 +339,7 @@ CREATE TABLE public.appointments (
 -- Name: TABLE appointments; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON TABLE public.appointments IS 'Appointments with immutable contact snapshots captured at booking time.';
+COMMENT ON TABLE public.appointments IS 'Appointments with immutable contact snapshots captured at booking confirmation time.';
 
 
 --
@@ -370,14 +353,14 @@ COMMENT ON COLUMN public.appointments.conversation_id IS 'Optional source conver
 -- Name: COLUMN appointments.customer_phone; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON COLUMN public.appointments.customer_phone IS 'Historical booking-time snapshot; it is not updated when an identity changes.';
+COMMENT ON COLUMN public.appointments.customer_phone IS 'Historical booking-time snapshot; does not change if customer profile is later updated.';
 
 
 --
 -- Name: COLUMN appointments.customer_email; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON COLUMN public.appointments.customer_email IS 'Historical booking-time snapshot; it is not updated when an identity changes.';
+COMMENT ON COLUMN public.appointments.customer_email IS 'Historical booking-time snapshot; does not change if customer profile is later updated.';
 
 
 --
@@ -405,33 +388,6 @@ CREATE TABLE public.business_auth_codes (
 --
 
 COMMENT ON TABLE public.business_auth_codes IS 'Short-lived hashed codes for business email verification and password reset.';
-
-
---
--- Name: business_channels; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.business_channels (
-    business_id uuid NOT NULL,
-    channel public.channel_type NOT NULL,
-    enabled boolean DEFAULT false NOT NULL,
-    provider text,
-    external_account_id text,
-    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    CONSTRAINT ck_business_channels_external_account CHECK (((external_account_id IS NULL) OR (btrim(external_account_id) <> ''::text))),
-    CONSTRAINT ck_business_channels_external_provider CHECK (((external_account_id IS NULL) OR (provider IS NOT NULL))),
-    CONSTRAINT ck_business_channels_metadata_object CHECK ((jsonb_typeof(metadata) = 'object'::text)),
-    CONSTRAINT ck_business_channels_provider CHECK (((provider IS NULL) OR (btrim(provider) <> ''::text)))
-);
-
-
---
--- Name: TABLE business_channels; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON TABLE public.business_channels IS 'Per-business configuration for exactly the supported communication channels.';
 
 
 --
@@ -632,7 +588,7 @@ CREATE TABLE public.conversation_messages (
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     CONSTRAINT ck_conversation_messages_content CHECK (
 CASE
-    WHEN (message_type = ANY (ARRAY['TEXT'::public.message_type, 'EMAIL'::public.message_type, 'CALL_TRANSCRIPT'::public.message_type])) THEN ((content IS NOT NULL) AND (btrim(content) <> ''::text))
+    WHEN (message_type = 'TEXT'::public.message_type) THEN ((content IS NOT NULL) AND (btrim(content) <> ''::text))
     ELSE (((content IS NOT NULL) AND (btrim(content) <> ''::text)) OR ((media_url IS NOT NULL) AND (btrim(media_url) <> ''::text)))
 END),
     CONSTRAINT ck_conversation_messages_external_id CHECK (((external_message_id IS NULL) OR (btrim(external_message_id) <> ''::text))),
@@ -645,7 +601,7 @@ END),
 -- Name: TABLE conversation_messages; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON TABLE public.conversation_messages IS 'Unified immutable message stream for every supported channel.';
+COMMENT ON TABLE public.conversation_messages IS 'Unified immutable message stream for web chat conversations.';
 
 
 --
@@ -682,8 +638,7 @@ COMMENT ON TABLE public.conversation_state IS 'Exactly one mutable AI workflow s
 CREATE TABLE public.conversations (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     business_id uuid NOT NULL,
-    customer_id uuid NOT NULL,
-    channel public.channel_type NOT NULL,
+    customer_id uuid,
     external_conversation_id text,
     status public.conversation_status DEFAULT 'ACTIVE'::public.conversation_status NOT NULL,
     started_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
@@ -702,48 +657,21 @@ CREATE TABLE public.conversations (
 -- Name: TABLE conversations; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON TABLE public.conversations IS 'A channel conversation between one business and one customer.';
+COMMENT ON TABLE public.conversations IS 'Natural conversation stream between an anonymous visitor or customer and the AI assistant.';
+
+
+--
+-- Name: COLUMN conversations.customer_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.conversations.customer_id IS 'Optional customer association; NULL for anonymous chat until booking flow starts.';
 
 
 --
 -- Name: COLUMN conversations.external_conversation_id; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON COLUMN public.conversations.external_conversation_id IS 'Optional provider thread or conversation identifier, unique per tenant and channel.';
-
-
---
--- Name: customer_identities; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.customer_identities (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    business_id uuid NOT NULL,
-    customer_id uuid NOT NULL,
-    channel public.channel_type NOT NULL,
-    identifier text NOT NULL,
-    display_name text,
-    verified boolean DEFAULT false NOT NULL,
-    is_primary boolean DEFAULT false NOT NULL,
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    CONSTRAINT ck_customer_identities_display_name CHECK (((display_name IS NULL) OR (btrim(display_name) <> ''::text))),
-    CONSTRAINT ck_customer_identities_identifier CHECK (((identifier = btrim(identifier)) AND (identifier <> ''::text)))
-);
-
-
---
--- Name: TABLE customer_identities; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON TABLE public.customer_identities IS 'Channel-specific customer identities; Instagram identifier stores the user ID, not username.';
-
-
---
--- Name: COLUMN customer_identities.business_id; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON COLUMN public.customer_identities.business_id IS 'Deliberate tenant key used for safe identity routing and tenant-consistent foreign keys.';
+COMMENT ON COLUMN public.conversations.external_conversation_id IS 'Optional website session or widget client conversation identifier.';
 
 
 --
@@ -754,9 +682,14 @@ CREATE TABLE public.customers (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     business_id uuid NOT NULL,
     name text,
+    phone text,
+    email text,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    CONSTRAINT ck_customers_name_nonempty CHECK (((name IS NULL) OR (btrim(name) <> ''::text)))
+    CONSTRAINT ck_customers_contact_info CHECK (((name IS NOT NULL) OR (phone IS NOT NULL) OR (email IS NOT NULL))),
+    CONSTRAINT ck_customers_email CHECK (((email IS NULL) OR ((email = lower(btrim(email))) AND (email ~~ '%_@_%._%'::text) AND (email !~ '[[:space:]]'::text)))),
+    CONSTRAINT ck_customers_name_nonempty CHECK (((name IS NULL) OR (btrim(name) <> ''::text))),
+    CONSTRAINT ck_customers_phone_nonempty CHECK (((phone IS NULL) OR (btrim(phone) <> ''::text)))
 );
 
 
@@ -764,7 +697,21 @@ CREATE TABLE public.customers (
 -- Name: TABLE customers; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON TABLE public.customers IS 'Tenant-owned customer profile without channel identifiers or contact details.';
+COMMENT ON TABLE public.customers IS 'Tenant-owned customer profile created when entering the booking flow.';
+
+
+--
+-- Name: COLUMN customers.phone; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.customers.phone IS 'Customer phone number collected for appointment booking.';
+
+
+--
+-- Name: COLUMN customers.email; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.customers.email IS 'Customer email address collected for appointment booking.';
 
 
 --
@@ -781,14 +728,6 @@ ALTER TABLE ONLY public.appointments
 
 ALTER TABLE ONLY public.business_auth_codes
     ADD CONSTRAINT pk_business_auth_codes PRIMARY KEY (id);
-
-
---
--- Name: business_channels pk_business_channels; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.business_channels
-    ADD CONSTRAINT pk_business_channels PRIMARY KEY (business_id, channel);
 
 
 --
@@ -853,14 +792,6 @@ ALTER TABLE ONLY public.conversation_state
 
 ALTER TABLE ONLY public.conversations
     ADD CONSTRAINT pk_conversations PRIMARY KEY (id);
-
-
---
--- Name: customer_identities pk_customer_identities; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.customer_identities
-    ADD CONSTRAINT pk_customer_identities PRIMARY KEY (id);
 
 
 --
@@ -934,13 +865,6 @@ CREATE INDEX idx_appointments_conversation ON public.appointments USING btree (b
 
 
 --
--- Name: idx_appointments_created_channel; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_appointments_created_channel ON public.appointments USING btree (business_id, created_channel, scheduled_start);
-
-
---
 -- Name: idx_appointments_customer_schedule; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -959,13 +883,6 @@ CREATE INDEX idx_appointments_status_schedule ON public.appointments USING btree
 --
 
 CREATE INDEX idx_business_auth_codes_active ON public.business_auth_codes USING btree (business_id, code_type, expires_at DESC) WHERE (consumed_at IS NULL);
-
-
---
--- Name: idx_business_channels_enabled; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_business_channels_enabled ON public.business_channels USING btree (business_id, enabled, channel);
 
 
 --
@@ -997,45 +914,45 @@ CREATE INDEX idx_conversation_state_business_updated ON public.conversation_stat
 
 
 --
--- Name: idx_conversations_business_channel_last_message; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_conversations_anonymous_last_message; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_conversations_business_channel_last_message ON public.conversations USING btree (business_id, channel, last_message_at DESC);
+CREATE INDEX idx_conversations_anonymous_last_message ON public.conversations USING btree (business_id, last_message_at DESC NULLS LAST) WHERE (customer_id IS NULL);
 
 
 --
--- Name: idx_conversations_customer_channel_last_message; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_conversations_customer_last_message; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_conversations_customer_channel_last_message ON public.conversations USING btree (business_id, customer_id, channel, last_message_at DESC);
+CREATE INDEX idx_conversations_customer_last_message ON public.conversations USING btree (business_id, customer_id, last_message_at DESC NULLS LAST) WHERE (customer_id IS NOT NULL);
 
 
 --
 -- Name: idx_conversations_status_last_message; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_conversations_status_last_message ON public.conversations USING btree (business_id, status, last_message_at DESC);
+CREATE INDEX idx_conversations_status_last_message ON public.conversations USING btree (business_id, status, last_message_at DESC NULLS LAST);
 
 
 --
--- Name: idx_customer_identities_customer_channel; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_customers_business_created; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_customer_identities_customer_channel ON public.customer_identities USING btree (business_id, customer_id, channel);
-
-
---
--- Name: idx_customer_identities_lookup; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_customer_identities_lookup ON public.customer_identities USING btree (business_id, channel, identifier);
+CREATE INDEX idx_customers_business_created ON public.customers USING btree (business_id, created_at DESC);
 
 
 --
--- Name: uq_business_channels_external_account; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_customers_business_email; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX uq_business_channels_external_account ON public.business_channels USING btree (channel, provider, external_account_id) WHERE (external_account_id IS NOT NULL);
+CREATE INDEX idx_customers_business_email ON public.customers USING btree (business_id, lower(email)) WHERE (email IS NOT NULL);
+
+
+--
+-- Name: idx_customers_business_phone; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_customers_business_phone ON public.customers USING btree (business_id, phone) WHERE (phone IS NOT NULL);
 
 
 --
@@ -1049,25 +966,7 @@ CREATE UNIQUE INDEX uq_conversation_messages_external_id ON public.conversation_
 -- Name: uq_conversations_external_id; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX uq_conversations_external_id ON public.conversations USING btree (business_id, channel, external_conversation_id) WHERE (external_conversation_id IS NOT NULL);
-
-
---
--- Name: uq_customer_identities_primary_per_channel; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX uq_customer_identities_primary_per_channel ON public.customer_identities USING btree (business_id, customer_id, channel) WHERE is_primary;
-
-
---
--- Name: uq_customer_identities_tenant_channel_identifier; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX uq_customer_identities_tenant_channel_identifier ON public.customer_identities USING btree (business_id, channel, (
-CASE
-    WHEN (channel = 'EMAIL'::public.channel_type) THEN lower(identifier)
-    ELSE identifier
-END));
+CREATE UNIQUE INDEX uq_conversations_external_id ON public.conversations USING btree (business_id, external_conversation_id) WHERE (external_conversation_id IS NOT NULL);
 
 
 --
@@ -1075,13 +974,6 @@ END));
 --
 
 CREATE TRIGGER trg_appointments_set_updated_at BEFORE UPDATE ON public.appointments FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
-
-
---
--- Name: business_channels trg_business_channels_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER trg_business_channels_set_updated_at BEFORE UPDATE ON public.business_channels FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 
 --
@@ -1169,13 +1061,6 @@ CREATE CONSTRAINT TRIGGER trg_conversations_state_cardinality AFTER INSERT OR DE
 
 
 --
--- Name: customer_identities trg_customer_identities_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER trg_customer_identities_set_updated_at BEFORE UPDATE ON public.customer_identities FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
-
-
---
 -- Name: customers trg_customers_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -1212,14 +1097,6 @@ ALTER TABLE ONLY public.appointments
 
 ALTER TABLE ONLY public.business_auth_codes
     ADD CONSTRAINT fk_business_auth_codes_business FOREIGN KEY (business_id) REFERENCES public.businesses(id) ON DELETE CASCADE;
-
-
---
--- Name: business_channels fk_business_channels_business; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.business_channels
-    ADD CONSTRAINT fk_business_channels_business FOREIGN KEY (business_id) REFERENCES public.businesses(id) ON DELETE CASCADE;
 
 
 --
@@ -1279,27 +1156,11 @@ ALTER TABLE ONLY public.conversations
 
 
 --
--- Name: conversations fk_conversations_business_channel; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.conversations
-    ADD CONSTRAINT fk_conversations_business_channel FOREIGN KEY (business_id, channel) REFERENCES public.business_channels(business_id, channel) DEFERRABLE INITIALLY DEFERRED;
-
-
---
 -- Name: conversations fk_conversations_customer; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.conversations
-    ADD CONSTRAINT fk_conversations_customer FOREIGN KEY (business_id, customer_id) REFERENCES public.customers(business_id, id) ON DELETE CASCADE;
-
-
---
--- Name: customer_identities fk_customer_identities_customer; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.customer_identities
-    ADD CONSTRAINT fk_customer_identities_customer FOREIGN KEY (business_id, customer_id) REFERENCES public.customers(business_id, id) ON DELETE CASCADE;
+    ADD CONSTRAINT fk_conversations_customer FOREIGN KEY (business_id, customer_id) REFERENCES public.customers(business_id, id) ON DELETE SET NULL (customer_id);
 
 
 --
@@ -1314,5 +1175,5 @@ ALTER TABLE ONLY public.customers
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 0VdbGomXScgXZN0PMQSvlr7bss0sKZNpazzqGx7yxwOSIu2ll84fGAeFfWhZL7R
+\unrestrict aUoxsmhF5jEPIIhqX3DoWlF4CQQrffsONpsQbRozgMdKhugzDJYkYEVkvIvtrah
 

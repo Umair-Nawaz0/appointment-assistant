@@ -3,16 +3,6 @@ BEGIN;
 SET LOCAL client_min_messages = warning;
 SET LOCAL search_path = public, pg_catalog;
 
--- Supported communication channels. Do not add provider-specific values here.
-CREATE TYPE channel_type AS ENUM (
-    'WHATSAPP',
-    'PHONE',
-    'SMS',
-    'EMAIL',
-    'INSTAGRAM',
-    'WEBSITE'
-);
-
 CREATE TYPE business_status AS ENUM (
     'ACTIVE',
     'INACTIVE',
@@ -61,9 +51,7 @@ CREATE TYPE message_type AS ENUM (
     'IMAGE',
     'AUDIO',
     'VIDEO',
-    'DOCUMENT',
-    'EMAIL',
-    'CALL_TRANSCRIPT'
+    'DOCUMENT'
 );
 
 CREATE FUNCTION set_updated_at()
@@ -283,21 +271,12 @@ CREATE TABLE business_schedule_overrides (
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
-CREATE TABLE business_channels (
-    business_id uuid NOT NULL,
-    channel channel_type NOT NULL,
-    enabled boolean DEFAULT false NOT NULL,
-    provider text,
-    external_account_id text,
-    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
-);
-
 CREATE TABLE customers (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     business_id uuid NOT NULL,
     name text,
+    phone text,
+    email text,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
@@ -323,24 +302,10 @@ CREATE TABLE business_sessions (
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
-CREATE TABLE customer_identities (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    business_id uuid NOT NULL,
-    customer_id uuid NOT NULL,
-    channel channel_type NOT NULL,
-    identifier text NOT NULL,
-    display_name text,
-    verified boolean DEFAULT false NOT NULL,
-    is_primary boolean DEFAULT false NOT NULL,
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
-);
-
 CREATE TABLE conversations (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     business_id uuid NOT NULL,
-    customer_id uuid NOT NULL,
-    channel channel_type NOT NULL,
+    customer_id uuid,
     external_conversation_id text,
     status conversation_status DEFAULT 'ACTIVE'::conversation_status NOT NULL,
     started_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
@@ -384,7 +349,6 @@ CREATE TABLE appointments (
     status appointment_status DEFAULT 'PENDING'::appointment_status NOT NULL,
     scheduled_start timestamp with time zone NOT NULL,
     scheduled_end timestamp with time zone NOT NULL,
-    created_channel channel_type NOT NULL,
     customer_name text,
     customer_phone text,
     customer_email text,
@@ -455,26 +419,24 @@ ALTER TABLE ONLY business_schedule_overrides
         reason IS NULL OR btrim(reason) <> ''::text
     );
 
-ALTER TABLE ONLY business_channels
-    ADD CONSTRAINT pk_business_channels PRIMARY KEY (business_id, channel),
-    ADD CONSTRAINT ck_business_channels_provider CHECK (
-        provider IS NULL OR btrim(provider) <> ''::text
-    ),
-    ADD CONSTRAINT ck_business_channels_external_account CHECK (
-        external_account_id IS NULL OR btrim(external_account_id) <> ''::text
-    ),
-    ADD CONSTRAINT ck_business_channels_external_provider CHECK (
-        external_account_id IS NULL OR provider IS NOT NULL
-    ),
-    ADD CONSTRAINT ck_business_channels_metadata_object CHECK (
-        jsonb_typeof(metadata) = 'object'::text
-    );
-
 ALTER TABLE ONLY customers
     ADD CONSTRAINT pk_customers PRIMARY KEY (id),
     ADD CONSTRAINT uq_customers_business_id_id UNIQUE (business_id, id),
     ADD CONSTRAINT ck_customers_name_nonempty CHECK (
         name IS NULL OR btrim(name) <> ''::text
+    ),
+    ADD CONSTRAINT ck_customers_email CHECK (
+        email IS NULL OR (
+            email = lower(btrim(email))
+            AND email LIKE '%_@_%._%'
+            AND email !~ '[[:space:]]'::text
+        )
+    ),
+    ADD CONSTRAINT ck_customers_phone_nonempty CHECK (
+        phone IS NULL OR btrim(phone) <> ''::text
+    ),
+    ADD CONSTRAINT ck_customers_contact_info CHECK (
+        name IS NOT NULL OR phone IS NOT NULL OR email IS NOT NULL
     );
 
 ALTER TABLE ONLY business_auth_codes
@@ -501,15 +463,6 @@ ALTER TABLE ONLY business_sessions
         revoked_at IS NULL OR revoked_at >= created_at
     );
 
-ALTER TABLE ONLY customer_identities
-    ADD CONSTRAINT pk_customer_identities PRIMARY KEY (id),
-    ADD CONSTRAINT ck_customer_identities_identifier CHECK (
-        identifier = btrim(identifier) AND identifier <> ''::text
-    ),
-    ADD CONSTRAINT ck_customer_identities_display_name CHECK (
-        display_name IS NULL OR btrim(display_name) <> ''::text
-    );
-
 ALTER TABLE ONLY conversations
     ADD CONSTRAINT pk_conversations PRIMARY KEY (id),
     ADD CONSTRAINT uq_conversations_business_id_id UNIQUE (business_id, id),
@@ -531,9 +484,7 @@ ALTER TABLE ONLY conversation_messages
     ADD CONSTRAINT pk_conversation_messages PRIMARY KEY (id),
     ADD CONSTRAINT ck_conversation_messages_content CHECK (
         CASE
-            WHEN message_type = ANY (
-                ARRAY['TEXT'::message_type, 'EMAIL'::message_type, 'CALL_TRANSCRIPT'::message_type]
-            ) THEN content IS NOT NULL AND btrim(content) <> ''::text
+            WHEN message_type = 'TEXT'::message_type THEN content IS NOT NULL AND btrim(content) <> ''::text
             ELSE
                 (content IS NOT NULL AND btrim(content) <> ''::text)
                 OR (media_url IS NOT NULL AND btrim(media_url) <> ''::text)
@@ -571,7 +522,11 @@ ALTER TABLE ONLY appointments
         customer_phone IS NULL OR btrim(customer_phone) <> ''::text
     ),
     ADD CONSTRAINT ck_appointments_customer_email CHECK (
-        customer_email IS NULL OR btrim(customer_email) <> ''::text
+        customer_email IS NULL OR (
+            customer_email = lower(btrim(customer_email))
+            AND customer_email LIKE '%_@_%._%'
+            AND customer_email !~ '[[:space:]]'::text
+        )
     );
 
 ALTER TABLE ONLY business_settings
@@ -586,10 +541,6 @@ ALTER TABLE ONLY business_schedule_overrides
     ADD CONSTRAINT fk_business_schedule_overrides_business FOREIGN KEY (business_id)
         REFERENCES businesses(id) ON UPDATE NO ACTION ON DELETE CASCADE;
 
-ALTER TABLE ONLY business_channels
-    ADD CONSTRAINT fk_business_channels_business FOREIGN KEY (business_id)
-        REFERENCES businesses(id) ON UPDATE NO ACTION ON DELETE CASCADE;
-
 ALTER TABLE ONLY customers
     ADD CONSTRAINT fk_customers_business FOREIGN KEY (business_id)
         REFERENCES businesses(id) ON UPDATE NO ACTION ON DELETE CASCADE;
@@ -602,18 +553,11 @@ ALTER TABLE ONLY business_sessions
     ADD CONSTRAINT fk_business_sessions_business FOREIGN KEY (business_id)
         REFERENCES businesses(id) ON UPDATE NO ACTION ON DELETE CASCADE;
 
-ALTER TABLE ONLY customer_identities
-    ADD CONSTRAINT fk_customer_identities_customer FOREIGN KEY (business_id, customer_id)
-        REFERENCES customers(business_id, id) ON UPDATE NO ACTION ON DELETE CASCADE;
-
 ALTER TABLE ONLY conversations
     ADD CONSTRAINT fk_conversations_business FOREIGN KEY (business_id)
         REFERENCES businesses(id) ON UPDATE NO ACTION ON DELETE CASCADE,
     ADD CONSTRAINT fk_conversations_customer FOREIGN KEY (business_id, customer_id)
-        REFERENCES customers(business_id, id) ON UPDATE NO ACTION ON DELETE CASCADE,
-    ADD CONSTRAINT fk_conversations_business_channel FOREIGN KEY (business_id, channel)
-        REFERENCES business_channels(business_id, channel)
-        ON UPDATE NO ACTION ON DELETE NO ACTION DEFERRABLE INITIALLY DEFERRED;
+        REFERENCES customers(business_id, id) ON UPDATE NO ACTION ON DELETE SET NULL (customer_id);
 
 ALTER TABLE ONLY conversation_messages
     ADD CONSTRAINT fk_conversation_messages_conversation FOREIGN KEY (business_id, conversation_id)
@@ -644,44 +588,30 @@ CREATE INDEX idx_business_sessions_active
     ON business_sessions USING btree (business_id, expires_at DESC)
     WHERE revoked_at IS NULL;
 
-CREATE UNIQUE INDEX uq_business_channels_external_account
-    ON business_channels USING btree (channel, provider, external_account_id)
-    WHERE external_account_id IS NOT NULL;
+CREATE INDEX idx_customers_business_created
+    ON customers USING btree (business_id, created_at DESC);
 
-CREATE INDEX idx_business_channels_enabled
-    ON business_channels USING btree (business_id, enabled, channel);
+CREATE INDEX idx_customers_business_email
+    ON customers USING btree (business_id, lower(email))
+    WHERE email IS NOT NULL;
 
-CREATE UNIQUE INDEX uq_customer_identities_tenant_channel_identifier
-    ON customer_identities USING btree (
-        business_id,
-        channel,
-        (CASE
-            WHEN channel = 'EMAIL'::channel_type THEN lower(identifier)
-            ELSE identifier
-        END)
-    );
-
-CREATE UNIQUE INDEX uq_customer_identities_primary_per_channel
-    ON customer_identities USING btree (business_id, customer_id, channel)
-    WHERE is_primary;
-
-CREATE INDEX idx_customer_identities_lookup
-    ON customer_identities USING btree (business_id, channel, identifier);
-
-CREATE INDEX idx_customer_identities_customer_channel
-    ON customer_identities USING btree (business_id, customer_id, channel);
-
-CREATE INDEX idx_conversations_customer_channel_last_message
-    ON conversations USING btree (business_id, customer_id, channel, last_message_at DESC);
+CREATE INDEX idx_customers_business_phone
+    ON customers USING btree (business_id, phone)
+    WHERE phone IS NOT NULL;
 
 CREATE INDEX idx_conversations_status_last_message
-    ON conversations USING btree (business_id, status, last_message_at DESC);
+    ON conversations USING btree (business_id, status, last_message_at DESC NULLS LAST);
 
-CREATE INDEX idx_conversations_business_channel_last_message
-    ON conversations USING btree (business_id, channel, last_message_at DESC);
+CREATE INDEX idx_conversations_customer_last_message
+    ON conversations USING btree (business_id, customer_id, last_message_at DESC NULLS LAST)
+    WHERE customer_id IS NOT NULL;
+
+CREATE INDEX idx_conversations_anonymous_last_message
+    ON conversations USING btree (business_id, last_message_at DESC NULLS LAST)
+    WHERE customer_id IS NULL;
 
 CREATE UNIQUE INDEX uq_conversations_external_id
-    ON conversations USING btree (business_id, channel, external_conversation_id)
+    ON conversations USING btree (business_id, external_conversation_id)
     WHERE external_conversation_id IS NOT NULL;
 
 CREATE INDEX idx_conversation_messages_timeline
@@ -707,9 +637,6 @@ CREATE INDEX idx_appointments_conversation
     ON appointments USING btree (business_id, conversation_id)
     WHERE conversation_id IS NOT NULL;
 
-CREATE INDEX idx_appointments_created_channel
-    ON appointments USING btree (business_id, created_channel, scheduled_start);
-
 CREATE TRIGGER trg_businesses_validate_timezone
     BEFORE INSERT OR UPDATE OF timezone ON businesses
     FOR EACH ROW EXECUTE FUNCTION validate_business_timezone();
@@ -730,16 +657,8 @@ CREATE TRIGGER trg_business_schedule_overrides_set_updated_at
     BEFORE UPDATE ON business_schedule_overrides
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
-CREATE TRIGGER trg_business_channels_set_updated_at
-    BEFORE UPDATE ON business_channels
-    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-
 CREATE TRIGGER trg_customers_set_updated_at
     BEFORE UPDATE ON customers
-    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-
-CREATE TRIGGER trg_customer_identities_set_updated_at
-    BEFORE UPDATE ON customer_identities
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 CREATE TRIGGER trg_conversations_set_updated_at
@@ -794,15 +713,13 @@ COMMENT ON TABLE business_hours IS
     'Weekly opening hours keyed by named weekday. An absent weekday is closed.';
 COMMENT ON TABLE business_schedule_overrides IS
     'A date-specific replacement for weekly hours; closed dates have no opening interval.';
-COMMENT ON TABLE business_channels IS
-    'Per-business configuration for exactly the supported communication channels.';
 
 COMMENT ON TABLE customers IS
-    'Tenant-owned customer profile without channel identifiers or contact details.';
-COMMENT ON TABLE customer_identities IS
-    'Channel-specific customer identities; Instagram identifier stores the user ID, not username.';
-COMMENT ON COLUMN customer_identities.business_id IS
-    'Deliberate tenant key used for safe identity routing and tenant-consistent foreign keys.';
+    'Tenant-owned customer profile created when entering the booking flow.';
+COMMENT ON COLUMN customers.phone IS
+    'Customer phone number collected for appointment booking.';
+COMMENT ON COLUMN customers.email IS
+    'Customer email address collected for appointment booking.';
 
 COMMENT ON COLUMN businesses.email IS
     'Unique dashboard login and verification email for the business itself.';
@@ -814,21 +731,23 @@ COMMENT ON TABLE business_sessions IS
     'Revocable sessions for authenticated businesses, identified by hashed cookie tokens.';
 
 COMMENT ON TABLE conversations IS
-    'A channel conversation between one business and one customer.';
+    'Natural conversation stream between an anonymous visitor or customer and the AI assistant.';
+COMMENT ON COLUMN conversations.customer_id IS
+    'Optional customer association; NULL for anonymous chat until booking flow starts.';
 COMMENT ON COLUMN conversations.external_conversation_id IS
-    'Optional provider thread or conversation identifier, unique per tenant and channel.';
+    'Optional website session or widget client conversation identifier.';
 COMMENT ON TABLE conversation_messages IS
-    'Unified immutable message stream for every supported channel.';
+    'Unified immutable message stream for web chat conversations.';
 COMMENT ON TABLE conversation_state IS
     'Exactly one mutable AI workflow state row for each non-closed conversation.';
 
 COMMENT ON TABLE appointments IS
-    'Appointments with immutable contact snapshots captured at booking time.';
+    'Appointments with immutable contact snapshots captured at booking confirmation time.';
 COMMENT ON COLUMN appointments.conversation_id IS
     'Optional source conversation; when present it must belong to the same tenant and customer.';
 COMMENT ON COLUMN appointments.customer_phone IS
-    'Historical booking-time snapshot; it is not updated when an identity changes.';
+    'Historical booking-time snapshot; does not change if customer profile is later updated.';
 COMMENT ON COLUMN appointments.customer_email IS
-    'Historical booking-time snapshot; it is not updated when an identity changes.';
+    'Historical booking-time snapshot; does not change if customer profile is later updated.';
 
 COMMIT;

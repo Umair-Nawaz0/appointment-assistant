@@ -19,7 +19,7 @@ VALUES (
     '00000000-0000-4000-8000-000000000001',
     'Demo Wellness Studio',
     'owner@example.com',
-    'scrypt$00000000000000000000000000000000$29155b73798500cf703199c954bf4d9ef68d1b922886bfb8ed7c69d5d40d1c1f710ba65939d47d6a61d5ad1ff4d21bc09d44883e22bc2a83d09364e94da638dc',
+    'seed-only-password-hash-not-for-authentication',
     '42 Wellness Avenue',
     'Karachi',
     'Sindh',
@@ -49,7 +49,7 @@ VALUES (
     20,
     true,
     true,
-    false,
+    true,
     true,
     true
 );
@@ -75,67 +75,25 @@ VALUES (
     'New Year holiday'
 );
 
-INSERT INTO business_channels (
+INSERT INTO customers (
+    id,
     business_id,
-    channel,
-    enabled,
-    provider,
-    external_account_id,
-    metadata
+    name,
+    phone,
+    email
 )
-VALUES (
-    '00000000-0000-4000-8000-000000000001',
-    'WEBSITE',
-    true,
-    'INTERNAL_WIDGET',
-    'demo-website-widget',
-    '{"widget_theme":"light"}'::jsonb
-);
-
-INSERT INTO customers (id, business_id, name)
 VALUES (
     '00000000-0000-4000-8000-000000000002',
     '00000000-0000-4000-8000-000000000001',
-    'Demo Customer'
+    'Demo Customer',
+    '+923001234567',
+    'demo.customer@example.com'
 );
-
-INSERT INTO customer_identities (
-    id,
-    business_id,
-    customer_id,
-    channel,
-    identifier,
-    display_name,
-    verified,
-    is_primary
-)
-VALUES
-    (
-        '00000000-0000-4000-8000-000000000003',
-        '00000000-0000-4000-8000-000000000001',
-        '00000000-0000-4000-8000-000000000002',
-        'WEBSITE',
-        'demo-session-001',
-        'Demo Customer',
-        false,
-        true
-    ),
-    (
-        '00000000-0000-4000-8000-000000000004',
-        '00000000-0000-4000-8000-000000000001',
-        '00000000-0000-4000-8000-000000000002',
-        'EMAIL',
-        'demo.customer@example.com',
-        'Demo Customer',
-        true,
-        true
-    );
 
 INSERT INTO conversations (
     id,
     business_id,
     customer_id,
-    channel,
     external_conversation_id,
     status,
     started_at
@@ -144,7 +102,6 @@ VALUES (
     '00000000-0000-4000-8000-000000000005',
     '00000000-0000-4000-8000-000000000001',
     '00000000-0000-4000-8000-000000000002',
-    'WEBSITE',
     'demo-website-thread-001',
     'ACTIVE',
     TIMESTAMPTZ '2030-01-10 09:00:00+05'
@@ -187,7 +144,7 @@ VALUES (
     '00000000-0000-4000-8000-000000000001',
     'BOOK_APPOINTMENT',
     'CONFIRM_DETAILS',
-    '{"customer_email":"demo.customer@example.com"}'::jsonb,
+    '{"customer_email":"demo.customer@example.com","customer_phone":"+923001234567"}'::jsonb,
     'Customer selected an available morning appointment.',
     'Please confirm your appointment details.'
 );
@@ -200,8 +157,8 @@ INSERT INTO appointments (
     status,
     scheduled_start,
     scheduled_end,
-    created_channel,
     customer_name,
+    customer_phone,
     customer_email
 )
 VALUES (
@@ -212,8 +169,8 @@ VALUES (
     'PENDING',
     TIMESTAMPTZ '2030-01-15 10:00:00+05',
     TIMESTAMPTZ '2030-01-15 10:30:00+05',
-    'WEBSITE',
     'Demo Customer',
+    '+923001234567',
     'demo.customer@example.com'
 );
 

@@ -1,11 +1,157 @@
-import { ArrowLeft, MessageSquare, Send } from 'lucide-react';
+import { ArrowLeft, MessageSquare, Send, User } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import { Badge, Button, Card, Empty, PageHeader, Select, Textarea } from '../components/ui';
 import { api, formatDate } from '../lib/api';
 import type { Conversation, ConversationStatus } from '../types';
 
-type Message={id:string;sender:string;messageType:string;content:string|null;sentAt:string};type Detail={conversation:Conversation;messages:Message[]};
-const tone=(s:ConversationStatus)=>s==='ACTIVE'?'green':s==='CLOSED'?'neutral':'amber';
-export function ConversationsPage(){const [items,setItems]=useState<Conversation[]>([]);const [selected,setSelected]=useState<Detail|null>(null);const [text,setText]=useState('');const load=()=>api<{conversations:Conversation[]}>('/conversations?limit=100').then(r=>setItems(r.conversations));useEffect(()=>{void load()},[]);const open=async(id:string)=>setSelected(await api<Detail>(`/conversations/${id}`));const status=async(value:ConversationStatus)=>{if(!selected)return;await api(`/conversations/${selected.conversation.id}/status`,{method:'PATCH',body:JSON.stringify({status:value})});await open(selected.conversation.id);await load()};const send=async(e:FormEvent)=>{e.preventDefault();if(!selected||!text.trim())return;await api(`/conversations/${selected.conversation.id}/messages`,{method:'POST',body:JSON.stringify({content:text})});setText('');await open(selected.conversation.id);await load()};
-if(selected)return <><PageHeader title={selected.conversation.customerName||'Unnamed customer'} description={`${selected.conversation.channel} conversation`} action={<Button className="button-secondary" onClick={()=>setSelected(null)}><ArrowLeft size={17}/>Back</Button>}/><div className="conversation-layout"><Card className="thread"><div className="thread-head"><Badge tone={tone(selected.conversation.status)}>{selected.conversation.status}</Badge><Select value={selected.conversation.status} onChange={e=>void status(e.target.value as ConversationStatus)}><option>ACTIVE</option><option>WAITING_CUSTOMER</option><option>WAITING_BUSINESS</option><option>CLOSED</option></Select></div><div className="messages">{selected.messages.map(message=><div className={`message message-${message.sender.toLowerCase()}`} key={message.id}><small>{message.sender}</small><p>{message.content||`[${message.messageType}]`}</p><time>{formatDate(message.sentAt)}</time></div>)}{!selected.messages.length&&<Empty title="No messages yet" text="The conversation transcript will appear here."/>}</div>{selected.conversation.status!=='CLOSED'&&<form className="composer" onSubmit={send}><Textarea rows={2} value={text} onChange={e=>setText(e.target.value)} placeholder="Write a reply…"/><Button><Send size={17}/></Button></form>}</Card></div></>;
-return <><PageHeader title="Conversations" description="A single inbox for every supported communication channel."/><Card>{items.length?<div className="conversation-list">{items.map(item=><button className="conversation-row" key={item.id} onClick={()=>void open(item.id)}><span className="channel-avatar"><MessageSquare size={20}/></span><div className="grow"><strong>{item.customerName||'Unnamed customer'}</strong><p>{item.lastMessage||'No messages yet'}</p><small>{item.lastMessageAt?formatDate(item.lastMessageAt):formatDate(item.startedAt)}</small></div><div><Badge tone="blue">{item.channel}</Badge><Badge tone={tone(item.status)}>{item.status}</Badge></div></button>)}</div>:<Empty title="No conversations yet" text="New channel conversations will appear here."/>}</Card></>}
+type Message = {
+  id: string;
+  sender: string;
+  messageType: string;
+  content: string | null;
+  sentAt: string;
+};
+
+type Detail = {
+  conversation: Conversation;
+  messages: Message[];
+};
+
+const tone = (s: ConversationStatus) => (s === 'ACTIVE' ? 'green' : s === 'CLOSED' ? 'neutral' : 'amber');
+
+export function ConversationsPage() {
+  const [items, setItems] = useState<Conversation[]>([]);
+  const [selected, setSelected] = useState<Detail | null>(null);
+  const [text, setText] = useState('');
+
+  const load = () => api<{ conversations: Conversation[] }>('/conversations?limit=100').then((r) => setItems(r.conversations));
+
+  useEffect(() => {
+    void load();
+  }, []);
+
+  const open = async (id: string) => setSelected(await api<Detail>(`/conversations/${id}`));
+
+  const status = async (value: ConversationStatus) => {
+    if (!selected) return;
+    await api(`/conversations/${selected.conversation.id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: value }),
+    });
+    await open(selected.conversation.id);
+    await load();
+  };
+
+  const send = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!selected || !text.trim()) return;
+    await api(`/conversations/${selected.conversation.id}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ content: text }),
+    });
+    setText('');
+    await open(selected.conversation.id);
+    await load();
+  };
+
+  if (selected) {
+    const isAnonymous = !selected.conversation.customerId;
+    const title = selected.conversation.customerName || (isAnonymous ? 'Anonymous Visitor' : 'Customer');
+
+    return (
+      <>
+        <PageHeader
+          title={title}
+          description={isAnonymous ? 'Website chat visitor (not yet booked)' : 'Website customer conversation'}
+          action={
+            <Button className="button-secondary" onClick={() => setSelected(null)}>
+              <ArrowLeft size={17} />
+              Back
+            </Button>
+          }
+        />
+        <div className="conversation-layout">
+          <Card className="thread">
+            <div className="thread-head">
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <Badge tone={tone(selected.conversation.status)}>{selected.conversation.status}</Badge>
+                {isAnonymous && <Badge tone="neutral">Anonymous</Badge>}
+              </div>
+              <Select
+                value={selected.conversation.status}
+                onChange={(e) => void status(e.target.value as ConversationStatus)}
+              >
+                <option value="ACTIVE">ACTIVE</option>
+                <option value="WAITING_CUSTOMER">WAITING_CUSTOMER</option>
+                <option value="WAITING_BUSINESS">WAITING_BUSINESS</option>
+                <option value="CLOSED">CLOSED</option>
+              </Select>
+            </div>
+            <div className="messages">
+              {selected.messages.map((message) => (
+                <div className={`message message-${message.sender.toLowerCase()}`} key={message.id}>
+                  <small>{message.sender}</small>
+                  <p>{message.content || `[${message.messageType}]`}</p>
+                  <time>{formatDate(message.sentAt)}</time>
+                </div>
+              ))}
+              {!selected.messages.length && (
+                <Empty title="No messages yet" text="The conversation transcript will appear here." />
+              )}
+            </div>
+            {selected.conversation.status !== 'CLOSED' && (
+              <form className="composer" onSubmit={send}>
+                <Textarea
+                  rows={2}
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  placeholder="Write a reply…"
+                />
+                <Button>
+                  <Send size={17} />
+                </Button>
+              </form>
+            )}
+          </Card>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <PageHeader
+        title="Conversations"
+        description="Live chat stream between website visitors, customers, and the AI appointment assistant."
+      />
+      <Card>
+        {items.length ? (
+          <div className="conversation-list">
+            {items.map((item) => {
+              const isAnonymous = !item.customerId;
+              const displayName = item.customerName || (isAnonymous ? 'Anonymous Visitor' : 'Customer');
+              return (
+                <button className="conversation-row" key={item.id} onClick={() => void open(item.id)}>
+                  <span className="channel-avatar">
+                    <MessageSquare size={20} />
+                  </span>
+                  <div className="grow">
+                    <strong>{displayName}</strong>
+                    <p>{item.lastMessage || 'No messages yet'}</p>
+                    <small>{item.lastMessageAt ? formatDate(item.lastMessageAt) : formatDate(item.startedAt)}</small>
+                  </div>
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    {isAnonymous && <Badge tone="neutral">Anonymous</Badge>}
+                    <Badge tone={tone(item.status)}>{item.status}</Badge>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <Empty title="No conversations yet" text="Website chat conversations will appear here." />
+        )}
+      </Card>
+    </>
+  );
+}

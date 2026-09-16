@@ -9,44 +9,30 @@ CREATE INDEX idx_business_sessions_active
     ON business_sessions USING btree (business_id, expires_at DESC)
     WHERE revoked_at IS NULL;
 
-CREATE UNIQUE INDEX uq_business_channels_external_account
-    ON business_channels USING btree (channel, provider, external_account_id)
-    WHERE external_account_id IS NOT NULL;
+CREATE INDEX idx_customers_business_created
+    ON customers USING btree (business_id, created_at DESC);
 
-CREATE INDEX idx_business_channels_enabled
-    ON business_channels USING btree (business_id, enabled, channel);
+CREATE INDEX idx_customers_business_email
+    ON customers USING btree (business_id, lower(email))
+    WHERE email IS NOT NULL;
 
-CREATE UNIQUE INDEX uq_customer_identities_tenant_channel_identifier
-    ON customer_identities USING btree (
-        business_id,
-        channel,
-        (CASE
-            WHEN channel = 'EMAIL'::channel_type THEN lower(identifier)
-            ELSE identifier
-        END)
-    );
-
-CREATE UNIQUE INDEX uq_customer_identities_primary_per_channel
-    ON customer_identities USING btree (business_id, customer_id, channel)
-    WHERE is_primary;
-
-CREATE INDEX idx_customer_identities_lookup
-    ON customer_identities USING btree (business_id, channel, identifier);
-
-CREATE INDEX idx_customer_identities_customer_channel
-    ON customer_identities USING btree (business_id, customer_id, channel);
-
-CREATE INDEX idx_conversations_customer_channel_last_message
-    ON conversations USING btree (business_id, customer_id, channel, last_message_at DESC);
+CREATE INDEX idx_customers_business_phone
+    ON customers USING btree (business_id, phone)
+    WHERE phone IS NOT NULL;
 
 CREATE INDEX idx_conversations_status_last_message
-    ON conversations USING btree (business_id, status, last_message_at DESC);
+    ON conversations USING btree (business_id, status, last_message_at DESC NULLS LAST);
 
-CREATE INDEX idx_conversations_business_channel_last_message
-    ON conversations USING btree (business_id, channel, last_message_at DESC);
+CREATE INDEX idx_conversations_customer_last_message
+    ON conversations USING btree (business_id, customer_id, last_message_at DESC NULLS LAST)
+    WHERE customer_id IS NOT NULL;
+
+CREATE INDEX idx_conversations_anonymous_last_message
+    ON conversations USING btree (business_id, last_message_at DESC NULLS LAST)
+    WHERE customer_id IS NULL;
 
 CREATE UNIQUE INDEX uq_conversations_external_id
-    ON conversations USING btree (business_id, channel, external_conversation_id)
+    ON conversations USING btree (business_id, external_conversation_id)
     WHERE external_conversation_id IS NOT NULL;
 
 CREATE INDEX idx_conversation_messages_timeline
@@ -71,6 +57,3 @@ CREATE INDEX idx_appointments_customer_schedule
 CREATE INDEX idx_appointments_conversation
     ON appointments USING btree (business_id, conversation_id)
     WHERE conversation_id IS NOT NULL;
-
-CREATE INDEX idx_appointments_created_channel
-    ON appointments USING btree (business_id, created_channel, scheduled_start);

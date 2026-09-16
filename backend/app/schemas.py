@@ -13,15 +13,6 @@ class ApiModel(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
 
-class Channel(StrEnum):
-    WHATSAPP = "WHATSAPP"
-    PHONE = "PHONE"
-    SMS = "SMS"
-    EMAIL = "EMAIL"
-    INSTAGRAM = "INSTAGRAM"
-    WEBSITE = "WEBSITE"
-
-
 class AppointmentStatus(StrEnum):
     PENDING = "PENDING"
     CONFIRMED = "CONFIRMED"
@@ -134,34 +125,22 @@ class OverrideUpdate(ApiModel):
     reason: str | None = Field(default=None, min_length=1, max_length=250)
 
 
-class ChannelUpdate(ApiModel):
-    enabled: bool
-    provider: str | None = Field(default=None, min_length=1, max_length=100)
-    externalAccountId: str | None = Field(default=None, min_length=1, max_length=250)
-    metadata: dict[str, Any] = Field(default_factory=dict)
-
-
-class IdentityInput(ApiModel):
-    channel: Channel
-    identifier: str = Field(min_length=1, max_length=500)
-    displayName: str | None = Field(default=None, min_length=1, max_length=200)
-    verified: bool = False
-    isPrimary: bool = False
-
-
 class CustomerCreate(ApiModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
-    identities: list[IdentityInput] = Field(default_factory=list, max_length=20)
+    phone: str | None = Field(default=None, min_length=1, max_length=100)
+    email: EmailStr | None = None
 
     @model_validator(mode="after")
     def useful_record(self):
-        if self.name is None and not self.identities:
-            raise ValueError("Provide a name or at least one channel identity.")
+        if not self.name and not self.phone and not self.email:
+            raise ValueError("Provide at least a name, phone number, or email address.")
         return self
 
 
 class CustomerUpdate(ApiModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
+    phone: str | None = Field(default=None, min_length=1, max_length=100)
+    email: EmailStr | None = None
 
 
 class AppointmentCreate(ApiModel):
@@ -170,7 +149,6 @@ class AppointmentCreate(ApiModel):
     scheduledStart: datetime
     scheduledEnd: datetime | None = None
     status: AppointmentStatus = AppointmentStatus.PENDING
-    createdChannel: Channel
     customerName: str | None = Field(default=None, min_length=1, max_length=200)
     customerPhone: str | None = Field(default=None, min_length=1, max_length=100)
     customerEmail: EmailStr | None = None
@@ -186,10 +164,13 @@ class AppointmentUpdate(ApiModel):
 
 
 class ConversationCreate(ApiModel):
-    customerId: UUID
-    channel: Channel
+    customerId: UUID | None = None
     externalConversationId: str | None = Field(default=None, min_length=1, max_length=500)
     currentIntent: str | None = Field(default=None, min_length=1, max_length=250)
+
+
+class ConversationUpdate(ApiModel):
+    customerId: UUID | None = None
 
 
 class StatusUpdate(ApiModel):

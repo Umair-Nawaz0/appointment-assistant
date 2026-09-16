@@ -123,10 +123,6 @@ async def signup(payload: Signup) -> dict[str, object]:
             payload.timezone,
         )
         await connection.execute("INSERT INTO business_settings (business_id) VALUES ($1)", business["id"])
-        await connection.execute(
-            "INSERT INTO business_channels (business_id,channel) SELECT $1,unnest(enum_range(NULL::channel_type))",
-            business["id"],
-        )
     code = await _issue_code(business["id"], "EMAIL_VERIFICATION")
     await send_verification(email, business["name"], code)
     result: dict[str, object] = {
