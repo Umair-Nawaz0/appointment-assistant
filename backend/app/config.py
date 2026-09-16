@@ -30,11 +30,12 @@ class Settings:
     app_url: str = os.getenv("APP_URL", "http://localhost:5173")
     frontend_origin: str = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
     database_url: str | None = os.getenv("DATABASE_URL")
-    pg_host: str = os.getenv("PGHOST", "/var/run/postgresql")
+    pg_host: str = os.getenv("PGHOST", "127.0.0.1")
     pg_port: int = _int("PGPORT", 5432)
     pg_database: str = os.getenv("PGDATABASE", "apointment_assitant")
     pg_user: str = os.getenv("PGUSER", "umair")
-    pg_password: str | None = os.getenv("PGPASSWORD") or None
+    pg_password: str | None = os.getenv("PGPASSWORD", "postgres") or None
+    backend_api_key: str = os.getenv("BACKEND_API_KEY", "appt_dcef54701d6e66eba727d4061616c70be6f1a8a450234f09ba585470e931c891")
     session_cookie_name: str = os.getenv("SESSION_COOKIE_NAME", "appointment_session")
     session_ttl_days: int = _int("SESSION_TTL_DAYS", 7)
     verification_ttl_minutes: int = _int("EMAIL_VERIFICATION_CODE_TTL_MINUTES", 15)

@@ -40,9 +40,9 @@ def install_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(asyncpg.PostgresError)
     async def database_handler(_request: Request, error: asyncpg.PostgresError) -> JSONResponse:
+        logger.error("PostgreSQL error %s: %s", error.sqlstate, error)
         if error.sqlstate in {"23503", "23514", "22P02", "22023"}:
             return JSONResponse(status_code=400, content={"error": {"code": "DATABASE_VALIDATION_ERROR", "message": "The submitted data is invalid."}})
-        logger.error("PostgreSQL error %s: %s", error.sqlstate, error)
         return JSONResponse(status_code=500, content={"error": {"code": "DATABASE_ERROR", "message": "The database request failed."}})
 
     @app.exception_handler(Exception)

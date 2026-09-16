@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from .config import ROOT_DIR, settings
 from .db import connect, disconnect, fetchrow
 from .errors import install_error_handlers
-from .routers import appointments, auth, business, conversations, customers, dashboard
+from .routers import appointments, auth, business, conversations, customers, dashboard, v1
 
 
 @asynccontextmanager
@@ -45,7 +45,7 @@ _auth_attempts: dict[str, deque[float]] = defaultdict(deque)
 
 @app.middleware("http")
 async def security_middleware(request: Request, call_next):
-    if request.url.path.startswith("/api") and request.method not in {"GET", "HEAD", "OPTIONS"}:
+    if request.url.path.startswith("/api") and not request.url.path.startswith("/api/v1") and request.method not in {"GET", "HEAD", "OPTIONS"}:
         origin = request.headers.get("origin")
         if origin and origin.rstrip("/") not in settings.allowed_origins:
             return JSONResponse(status_code=403, content={"error": {"code": "UNTRUSTED_ORIGIN", "message": "Untrusted request origin."}})
@@ -78,6 +78,7 @@ app.include_router(business.router)
 app.include_router(customers.router)
 app.include_router(appointments.router)
 app.include_router(conversations.router)
+app.include_router(v1.router)
 
 frontend_dist = ROOT_DIR / "frontend" / "dist"
 if frontend_dist.is_dir():

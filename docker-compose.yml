@@ -2,30 +2,7 @@ name: ${COMPOSE_PROJECT_NAME:-appointment-assistant}
 
 services:
   # ==========================================
-  # 1. PostgreSQL Database Service
-  # ==========================================
-  db:
-    image: postgres:16-alpine
-    container_name: appointment-assistant-db
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: ${PGDATABASE:-apointment_assitant}
-      POSTGRES_USER: ${PGUSER:-postgres}
-      POSTGRES_PASSWORD: ${PGPASSWORD:-postgres}
-    ports:
-      - "${PG_HOST_PORT:-5433}:5432"
-    volumes:
-      - db_data:/var/lib/postgresql/data
-      - ./database/initdb:/docker-entrypoint-initdb.d:ro
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${PGUSER:-postgres} -d ${PGDATABASE:-apointment_assitant}"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-      start_period: 10s
-
-  # ==========================================
-  # 2. FastAPI Backend Service
+  # 1. FastAPI Backend Service
   # ==========================================
   backend:
     build:
@@ -33,18 +10,17 @@ services:
       dockerfile: backend/Dockerfile
     container_name: appointment-assistant-backend
     restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
+    network_mode: host
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       HOST: 0.0.0.0
       PORT: 4000
-      PGHOST: db
-      PGPORT: 5432
+      PGHOST: ${PGHOST:-127.0.0.1}
+      PGPORT: ${PGPORT:-5432}
       PGDATABASE: ${PGDATABASE:-apointment_assitant}
-      PGUSER: ${PGUSER:-postgres}
+      PGUSER: ${PGUSER:-umair}
       PGPASSWORD: ${PGPASSWORD:-postgres}
+      BACKEND_API_KEY: ${BACKEND_API_KEY:-appt_dcef54701d6e66eba727d4061616c70be6f1a8a450234f09ba585470e931c891}
       APP_URL: ${APP_URL:-http://localhost:5173}
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:5173}
       FRONTEND_ORIGINS: ${FRONTEND_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,http://localhost:4000,http://127.0.0.1:4000,http://localhost:5678,http://127.0.0.1:5678}
@@ -54,19 +30,17 @@ services:
       PASSWORD_RESET_TTL_MINUTES: ${PASSWORD_RESET_TTL_MINUTES:-60}
       MAIL_MODE: ${MAIL_MODE:-console}
       MAIL_FROM: ${MAIL_FROM:-Appointment Assistant <no-reply@example.com>}
-    ports:
-      - "${PORT:-4000}:4000"
     volumes:
       - ./backend:/app/backend
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:4000/api/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:4000/api/health || exit 1"]
       interval: 5s
       timeout: 5s
       retries: 10
-      start_period: 15s
+      start_period: 10s
 
   # ==========================================
-  # 3. React / Vite Frontend Service
+  # 2. React / Vite Frontend Service
   # ==========================================
   frontend:
     build:
@@ -74,30 +48,22 @@ services:
       dockerfile: frontend/Dockerfile
     container_name: appointment-assistant-frontend
     restart: unless-stopped
-    depends_on:
-      backend:
-        condition: service_healthy
+    network_mode: host
     environment:
-      VITE_BACKEND_URL: http://backend:4000
+      VITE_BACKEND_URL: http://localhost:4000
       VITE_HOST: 0.0.0.0
-    ports:
-      - "5173:5173"
     volumes:
       - ./frontend:/app
       - /app/node_modules
 
   # ==========================================
-  # 4. n8n Workflow Automation Engine
+  # 3. n8n Workflow Automation Engine
   # ==========================================
   n8n:
     image: ${N8N_IMAGE:-docker.n8n.io/n8nio/n8n:latest}
     container_name: appointment-assistant-n8n
     restart: unless-stopped
-    depends_on:
-      backend:
-        condition: service_healthy
-    ports:
-      - "${N8N_PORT:-5678}:${N8N_PORT:-5678}"
+    network_mode: host
     environment:
       N8N_HOST: ${N8N_HOST:-localhost}
       N8N_PORT: ${N8N_PORT:-5678}
@@ -122,8 +88,6 @@ services:
       - ./data:/files
       - ./credentials:/bootstrap/credentials:ro
       - ./workflow:/bootstrap/workflows:ro
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     logging:
       driver: json-file
       options:
@@ -131,12 +95,33 @@ services:
         max-file: "3"
     stop_grace_period: 30s
 
+  # ==========================================
+  # 4. Optional Isolated Container DB
+  # ==========================================
+  db:
+    image: postgres:16-alpine
+    container_name: appointment-assistant-db
+    profiles:
+      - container-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${PGDATABASE:-apointment_assitant}
+      POSTGRES_USER: ${PGUSER:-umair}
+      POSTGRES_PASSWORD: ${PGPASSWORD:-postgres}
+    ports:
+      - "${PG_HOST_PORT:-5433}:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./database/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PGUSER:-umair} -d ${PGDATABASE:-apointment_assitant}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
 volumes:
   db_data:
     name: ${DB_DATA_VOLUME:-appointment-assistant_db_data}
   n8n_data:
     name: ${N8N_DATA_VOLUME:-appointment-assistant_n8n_data}
-
-networks:
-  default:
-    name: ${COMPOSE_NETWORK:-appointment-assistant-network}
