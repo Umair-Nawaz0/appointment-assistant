@@ -76,13 +76,34 @@ async def test_authentication_and_tenant_apis(client: httpx.AsyncClient):
     assert updated_business.status_code == 200, updated_business.text
     assert updated_business.json()["business"]["countryCode"] == "PK"
 
+    # Test updating business profile with empty optional fields (should convert to None, not fail)
+    empty_profile = await client.put("/api/business", json={
+        "name": "FastAPI Test Studio", "address": "", "city": "",
+        "stateProvince": "", "postalCode": "", "countryCode": "",
+        "industry": "", "timezone": "Asia/Karachi",
+        "extraForbiddenField": "shouldBeIgnored",
+    })
+    assert empty_profile.status_code == 200, empty_profile.text
+    assert empty_profile.json()["business"]["countryCode"] is None
+
     settings = await client.put("/api/business/settings", json={
         "appointmentDurationMinutes": 45, "bookingWindowDays": 60, "maximumAppointmentsPerDay": 12,
         "allowCancellation": True, "allowReschedule": True, "collectPhone": False,
         "collectEmail": True, "confirmationRequired": True,
+        "updatedAt": "2026-09-18T00:00:00Z", # extra field from get_settings
     })
     assert settings.status_code == 200, settings.text
     assert settings.json()["settings"]["appointmentDurationMinutes"] == 45
+
+    # Test updating settings with empty maximum per day
+    settings_empty_cap = await client.put("/api/business/settings", json={
+        "appointmentDurationMinutes": 45, "bookingWindowDays": 60, "maximumAppointmentsPerDay": "",
+        "allowCancellation": True, "allowReschedule": True, "collectPhone": False,
+        "collectEmail": True, "confirmationRequired": True,
+    })
+    assert settings_empty_cap.status_code == 200, settings_empty_cap.text
+    assert settings_empty_cap.json()["settings"]["maximumAppointmentsPerDay"] is None
+
     hours = await client.put("/api/business/hours", json={"hours": [
         {"dayOfWeek": "MONDAY", "opensAt": "09:00", "closesAt": "17:00"},
         {"dayOfWeek": "TUESDAY", "opensAt": "10:00", "closesAt": "18:00"},
@@ -127,14 +148,55 @@ async def test_authentication_and_tenant_apis(client: httpx.AsyncClient):
     assert associate.json()["conversation"]["customerId"] == customer_id
     conversation_id = anon_conv_id
 
+    # 1. Reject booking on closed day (Sunday)
+    now_utc = datetime.now(timezone.utc)
+    days_to_sunday = (6 - now_utc.weekday()) % 7
+    if days_to_sunday == 0:
+        days_to_sunday = 7
+    closed_sunday = (now_utc + timedelta(days=days_to_sunday)).replace(hour=6, minute=0, second=0, microsecond=0)
+    closed_res = await client.post("/api/appointments", json={
+        "customerId": customer_id,
+        "conversationId": conversation_id,
+        "scheduledStart": closed_sunday.isoformat(),
+    })
+    assert closed_res.status_code == 400
+    assert closed_res.json()["error"]["code"] == "BUSINESS_CLOSED"
+
+    # 2. Reject booking outside business hours (e.g. 2:00 AM PKT = 21:00 UTC previous day)
+    days_to_monday = (0 - now_utc.weekday()) % 7
+    if days_to_monday == 0:
+        days_to_monday = 7
+    # 06:00 UTC = 11:00 AM PKT (open: 09:00 - 17:00 PKT)
+    valid_monday = (now_utc + timedelta(days=days_to_monday)).replace(hour=6, minute=0, second=0, microsecond=0)
+    # 22:00 UTC = 03:00 AM PKT (outside hours)
+    invalid_time = valid_monday.replace(hour=22)
+    outside_res = await client.post("/api/appointments", json={
+        "customerId": customer_id,
+        "conversationId": conversation_id,
+        "scheduledStart": invalid_time.isoformat(),
+    })
+    assert outside_res.status_code == 400
+    assert outside_res.json()["error"]["code"] == "OUTSIDE_BUSINESS_HOURS"
+
+    # 3. Successful booking during operating hours
     appointment = await client.post("/api/appointments", json={
         "customerId": customer_id,
         "conversationId": conversation_id,
-        "scheduledStart": (datetime.now(timezone.utc) + timedelta(days=2)).isoformat(),
+        "scheduledStart": valid_monday.isoformat(),
     })
     assert appointment.status_code == 201, appointment.text
     assert appointment.json()["appointment"]["customerEmail"] == "ada@example.com"
     appointment_id = appointment.json()["appointment"]["id"]
+
+    # 4. Reject conflicting overlapping slot
+    conflict_res = await client.post("/api/appointments", json={
+        "customerId": customer_id,
+        "conversationId": conversation_id,
+        "scheduledStart": valid_monday.isoformat(),
+    })
+    assert conflict_res.status_code == 409
+    assert conflict_res.json()["error"]["code"] == "SLOT_CONFLICT"
+
     appointment_list = await client.get("/api/appointments?limit=100&status=PENDING")
     assert appointment_list.status_code == 200 and appointment_list.json()["total"] == 1
     confirmed = await client.patch(f"/api/appointments/{appointment_id}", json={"status": "CONFIRMED"})

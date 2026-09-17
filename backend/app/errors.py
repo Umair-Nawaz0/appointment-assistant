@@ -29,9 +29,17 @@ def install_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(RequestValidationError)
     async def validation_handler(_request: Request, error: RequestValidationError) -> JSONResponse:
+        errs = error.errors()
+        if errs:
+            first_err = errs[0]
+            loc = " -> ".join(str(l) for l in first_err.get("loc", []) if l != "body")
+            msg = first_err.get("msg", "Invalid input")
+            friendly_msg = f"{loc}: {msg}" if loc else msg
+        else:
+            friendly_msg = "Please check the submitted fields."
         return JSONResponse(
             status_code=400,
-            content={"error": {"code": "VALIDATION_ERROR", "message": "Please check the submitted fields.", "details": error.errors()}},
+            content={"error": {"code": "VALIDATION_ERROR", "message": friendly_msg, "details": errs}},
         )
 
     @app.exception_handler(asyncpg.UniqueViolationError)

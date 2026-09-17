@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from ..config import settings
 from ..db import execute, fetch, fetchrow, transaction
 from ..errors import AppError
+from ..scheduling import validate_appointment_slot
 
 router = APIRouter(prefix="/api/v1", tags=["Workflow v1 API"])
 
@@ -483,6 +484,18 @@ async def validate_appointment_date_v1(
                     "earliest_allowed_date": earliest_date.isoformat(),
                     "latest_allowed_date": latest_date.isoformat(),
                 }
+            day_opens = override["opens_at"] if override and override["opens_at"] else (hours["opens_at"] if hours else None)
+            day_closes = override["closes_at"] if override and override["closes_at"] else (hours["closes_at"] if hours else None)
+            if day_opens and day_closes:
+                if req_time < day_opens or req_time >= day_closes:
+                    return {
+                        "valid": False,
+                        "reason": "OUTSIDE_BUSINESS_HOURS",
+                        "message": f"The business operates between {day_opens.strftime('%H:%M')} and {day_closes.strftime('%H:%M')} on this day.",
+                        "business_timezone": tz_name,
+                        "earliest_allowed_date": earliest_date.isoformat(),
+                        "latest_allowed_date": latest_date.isoformat(),
+                    }
         except ValueError:
             return {
                 "valid": False,
@@ -665,6 +678,20 @@ async def book_appointment_v1(
     clean_email = payload.customer_email.strip() if payload.customer_email else None
 
     async with transaction() as connection:
+        try:
+            start_dt, end_dt, tz = await validate_appointment_slot(
+                connection,
+                payload.business_id,
+                start_dt,
+                end_dt,
+            )
+        except AppError as e:
+            return {
+                "success": False,
+                "error": e.message,
+                "code": e.code,
+            }
+
         customer = await connection.fetchrow(
             """SELECT id, name, phone, email FROM customers
                 WHERE business_id = $1
@@ -712,21 +739,6 @@ async def book_appointment_v1(
                 payload.business_id,
                 payload.conversation_id,
             )
-
-        # Check collision
-        collision = await connection.fetchval(
-            """SELECT id FROM appointments
-                WHERE business_id = $1 AND status <> 'CANCELLED'
-                  AND scheduled_start < $3 AND scheduled_end > $2""",
-            payload.business_id,
-            start_dt,
-            end_dt,
-        )
-        if collision:
-            return {
-                "success": False,
-                "error": "This slot has just been booked by someone else. Please pick another available time.",
-            }
 
         # Create appointment
         apt = await connection.fetchrow(

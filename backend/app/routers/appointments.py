@@ -9,6 +9,7 @@ from ..db import fetch, fetchrow, transaction
 from ..dependencies import AuthBusiness, current_business
 from ..errors import AppError
 from ..schemas import AppointmentCreate, AppointmentStatus, AppointmentUpdate
+from ..scheduling import validate_appointment_slot
 
 router = APIRouter(prefix="/api/appointments", tags=["Appointments"])
 
@@ -54,34 +55,13 @@ async def list_appointments(
 async def create_appointment(
     payload: AppointmentCreate, user: AuthBusiness = Depends(current_business)
 ) -> dict[str, object]:
-    if payload.scheduledStart.tzinfo is None:
-        raise AppError(400, "Appointment start must include a timezone.", "INVALID_SCHEDULE")
     async with transaction() as connection:
-        config = await connection.fetchrow(
-            """SELECT appointment_duration_minutes, booking_window_days, maximum_appointments_per_day
-                 FROM business_settings WHERE business_id = $1 FOR UPDATE""",
+        start, end, _tz = await validate_appointment_slot(
+            connection,
             user.business_id,
+            payload.scheduledStart,
+            payload.scheduledEnd,
         )
-        if not config:
-            raise AppError(409, "Business booking settings are not configured.", "SETTINGS_MISSING")
-        start = payload.scheduledStart
-        end = payload.scheduledEnd or start + timedelta(minutes=config["appointment_duration_minutes"])
-        now = datetime.now(timezone.utc)
-        if start <= now:
-            raise AppError(400, "Appointment must be scheduled in the future.", "INVALID_SCHEDULE")
-        if start > now + timedelta(days=config["booking_window_days"]):
-            raise AppError(400, "Appointment is outside the booking window.", "INVALID_SCHEDULE")
-        if config["maximum_appointments_per_day"]:
-            count = await connection.fetchval(
-                """SELECT count(*)::int FROM appointments a JOIN businesses b ON b.id = a.business_id
-                   WHERE a.business_id = $1
-                     AND (a.scheduled_start AT TIME ZONE b.timezone)::date = ($2::timestamptz AT TIME ZONE b.timezone)::date
-                     AND a.status NOT IN ('CANCELLED', 'NO_SHOW')""",
-                user.business_id,
-                start,
-            )
-            if count >= config["maximum_appointments_per_day"]:
-                raise AppError(409, "Daily appointment capacity has been reached.", "DAILY_CAPACITY_REACHED")
         customer = await connection.fetchrow(
             """SELECT c.name, c.phone, c.email
                  FROM customers c
@@ -121,32 +101,60 @@ async def update_appointment(
 ) -> dict[str, object]:
     if not payload.model_fields_set:
         raise AppError(400, "Provide at least one change.", "VALIDATION_ERROR")
-    row = await fetchrow(
-        """UPDATE appointments
-              SET status = COALESCE($1::appointment_status, status),
-                  scheduled_start = COALESCE($2, scheduled_start),
-                  scheduled_end = COALESCE($3, scheduled_end),
-                  customer_name = CASE WHEN $4 THEN $5 ELSE customer_name END,
-                  customer_phone = CASE WHEN $6 THEN $7 ELSE customer_phone END,
-                  customer_email = CASE WHEN $8 THEN $9 ELSE customer_email END
-            WHERE business_id = $10 AND id = $11
-        RETURNING id, customer_id AS "customerId", status::text,
-                  scheduled_start AS "scheduledStart", scheduled_end AS "scheduledEnd",
-                  customer_name AS "customerName", customer_phone AS "customerPhone", customer_email AS "customerEmail" """,
-        payload.status.value if payload.status else None,
-        payload.scheduledStart,
-        payload.scheduledEnd,
-        "customerName" in payload.model_fields_set,
-        payload.customerName,
-        "customerPhone" in payload.model_fields_set,
-        payload.customerPhone,
-        "customerEmail" in payload.model_fields_set,
-        str(payload.customerEmail).lower() if payload.customerEmail else None,
-        user.business_id,
-        appointment_id,
-    )
-    if not row:
-        raise AppError(404, "Appointment not found.", "NOT_FOUND")
+    async with transaction() as connection:
+        current = await connection.fetchrow(
+            """SELECT scheduled_start, scheduled_end, status::text
+                 FROM appointments
+                WHERE business_id = $1 AND id = $2 FOR UPDATE""",
+            user.business_id,
+            appointment_id,
+        )
+        if not current:
+            raise AppError(404, "Appointment not found.", "NOT_FOUND")
+
+        new_start = payload.scheduledStart
+        new_end = payload.scheduledEnd
+
+        if new_start is not None or new_end is not None:
+            calc_start = new_start or current["scheduled_start"]
+            calc_end = new_end or (
+                calc_start + (current["scheduled_end"] - current["scheduled_start"])
+                if new_start and not new_end else current["scheduled_end"]
+            )
+            validated_start, validated_end, _ = await validate_appointment_slot(
+                connection,
+                user.business_id,
+                calc_start,
+                calc_end,
+                exclude_appointment_id=appointment_id,
+            )
+            new_start = validated_start
+            new_end = validated_end
+
+        row = await connection.fetchrow(
+            """UPDATE appointments
+                  SET status = COALESCE($1::appointment_status, status),
+                      scheduled_start = COALESCE($2, scheduled_start),
+                      scheduled_end = COALESCE($3, scheduled_end),
+                      customer_name = CASE WHEN $4 THEN $5 ELSE customer_name END,
+                      customer_phone = CASE WHEN $6 THEN $7 ELSE customer_phone END,
+                      customer_email = CASE WHEN $8 THEN $9 ELSE customer_email END
+                WHERE business_id = $10 AND id = $11
+            RETURNING id, customer_id AS "customerId", status::text,
+                      scheduled_start AS "scheduledStart", scheduled_end AS "scheduledEnd",
+                      customer_name AS "customerName", customer_phone AS "customerPhone", customer_email AS "customerEmail" """,
+            payload.status.value if payload.status else None,
+            new_start,
+            new_end,
+            "customerName" in payload.model_fields_set,
+            payload.customerName,
+            "customerPhone" in payload.model_fields_set,
+            payload.customerPhone,
+            "customerEmail" in payload.model_fields_set,
+            str(payload.customerEmail).lower() if payload.customerEmail else None,
+            user.business_id,
+            appointment_id,
+        )
     return {"appointment": dict(row)}
 
 

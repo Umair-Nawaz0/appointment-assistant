@@ -6,11 +6,13 @@ from enum import StrEnum
 from typing import Any
 from uuid import UUID
 
+from zoneinfo import ZoneInfo
+
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 
 class ApiModel(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    model_config = ConfigDict(str_strip_whitespace=True, extra="ignore")
 
 
 class AppointmentStatus(StrEnum):
@@ -52,7 +54,25 @@ class Signup(ApiModel, PasswordMixin):
     email: EmailStr
     password: str
     timezone: str = Field(default="UTC", min_length=1, max_length=100)
-    industry: str | None = Field(default=None, min_length=1, max_length=120)
+    industry: str | None = Field(default=None, max_length=120)
+
+    @field_validator("industry", mode="before")
+    @classmethod
+    def empty_industry_none(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            val = value.strip()
+            return val if val else None
+        return value
+
+    @field_validator("timezone")
+    @classmethod
+    def validate_tz(cls, value: str) -> str:
+        value = value.strip()
+        try:
+            ZoneInfo(value)
+        except Exception:
+            raise ValueError(f"Invalid timezone '{value}'. Use an IANA timezone such as Asia/Karachi or UTC.")
+        return value
 
 
 class Login(ApiModel):
@@ -77,29 +97,63 @@ class ResetPassword(ApiModel, PasswordMixin):
 
 class BusinessUpdate(ApiModel):
     name: str = Field(min_length=2, max_length=200)
-    address: str | None = Field(default=None, min_length=1, max_length=250)
-    city: str | None = Field(default=None, min_length=1, max_length=250)
-    stateProvince: str | None = Field(default=None, min_length=1, max_length=250)
-    postalCode: str | None = Field(default=None, min_length=1, max_length=250)
-    countryCode: str | None = Field(default=None, min_length=2, max_length=2)
-    industry: str | None = Field(default=None, min_length=1, max_length=250)
+    address: str | None = Field(default=None, max_length=250)
+    city: str | None = Field(default=None, max_length=250)
+    stateProvince: str | None = Field(default=None, max_length=250)
+    postalCode: str | None = Field(default=None, max_length=250)
+    countryCode: str | None = Field(default=None, max_length=2)
+    industry: str | None = Field(default=None, max_length=250)
     timezone: str = Field(min_length=1, max_length=100)
+
+    @field_validator("address", "city", "stateProvince", "postalCode", "countryCode", "industry", mode="before")
+    @classmethod
+    def empty_strings_to_none(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            val = value.strip()
+            return val if val else None
+        return value
 
     @field_validator("countryCode")
     @classmethod
     def upper_country(cls, value: str | None) -> str | None:
-        return value.upper() if value else None
+        if not value:
+            return None
+        val = value.strip().upper()
+        if len(val) != 2:
+            raise ValueError("Country code must be a 2-letter ISO code (e.g. PK, US).")
+        return val
+
+    @field_validator("timezone")
+    @classmethod
+    def validate_tz(cls, value: str) -> str:
+        value = value.strip()
+        try:
+            ZoneInfo(value)
+        except Exception:
+            raise ValueError(f"Invalid timezone '{value}'. Use an IANA timezone such as Asia/Karachi or UTC.")
+        return value
 
 
 class SettingsUpdate(ApiModel):
     appointmentDurationMinutes: int = Field(ge=1, le=1440)
     bookingWindowDays: int = Field(ge=1, le=3650)
     maximumAppointmentsPerDay: int | None = Field(default=None, gt=0)
-    allowCancellation: bool
-    allowReschedule: bool
-    collectPhone: bool
-    collectEmail: bool
-    confirmationRequired: bool
+    allowCancellation: bool = True
+    allowReschedule: bool = True
+    collectPhone: bool = True
+    collectEmail: bool = False
+    confirmationRequired: bool = False
+
+    @field_validator("maximumAppointmentsPerDay", mode="before")
+    @classmethod
+    def empty_max_to_none(cls, value: Any) -> int | None:
+        if value is None or value == "" or value == 0 or value == "0":
+            return None
+        try:
+            val = int(value)
+            return val if val > 0 else None
+        except (ValueError, TypeError):
+            return None
 
 
 class HoursRow(ApiModel):
@@ -122,13 +176,37 @@ class OverrideUpdate(ApiModel):
     isClosed: bool
     opensAt: time | None = None
     closesAt: time | None = None
-    reason: str | None = Field(default=None, min_length=1, max_length=250)
+    reason: str | None = Field(default=None, max_length=250)
+
+    @field_validator("reason", mode="before")
+    @classmethod
+    def empty_reason_none(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            val = value.strip()
+            return val if val else None
+        return value
 
 
 class CustomerCreate(ApiModel):
-    name: str | None = Field(default=None, min_length=1, max_length=200)
-    phone: str | None = Field(default=None, min_length=1, max_length=100)
+    name: str | None = Field(default=None, max_length=200)
+    phone: str | None = Field(default=None, max_length=100)
     email: EmailStr | None = None
+
+    @field_validator("name", "phone", mode="before")
+    @classmethod
+    def empty_to_none(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            val = value.strip()
+            return val if val else None
+        return value
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def empty_email_to_none(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            val = value.strip()
+            return val if val else None
+        return value
 
     @model_validator(mode="after")
     def useful_record(self):
@@ -138,9 +216,25 @@ class CustomerCreate(ApiModel):
 
 
 class CustomerUpdate(ApiModel):
-    name: str | None = Field(default=None, min_length=1, max_length=200)
-    phone: str | None = Field(default=None, min_length=1, max_length=100)
+    name: str | None = Field(default=None, max_length=200)
+    phone: str | None = Field(default=None, max_length=100)
     email: EmailStr | None = None
+
+    @field_validator("name", "phone", mode="before")
+    @classmethod
+    def empty_to_none(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            val = value.strip()
+            return val if val else None
+        return value
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def empty_email_to_none(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            val = value.strip()
+            return val if val else None
+        return value
 
 
 class AppointmentCreate(ApiModel):
@@ -149,18 +243,50 @@ class AppointmentCreate(ApiModel):
     scheduledStart: datetime
     scheduledEnd: datetime | None = None
     status: AppointmentStatus = AppointmentStatus.PENDING
-    customerName: str | None = Field(default=None, min_length=1, max_length=200)
-    customerPhone: str | None = Field(default=None, min_length=1, max_length=100)
+    customerName: str | None = Field(default=None, max_length=200)
+    customerPhone: str | None = Field(default=None, max_length=100)
     customerEmail: EmailStr | None = None
+
+    @field_validator("customerName", "customerPhone", mode="before")
+    @classmethod
+    def empty_contact_none(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            val = value.strip()
+            return val if val else None
+        return value
+
+    @field_validator("customerEmail", mode="before")
+    @classmethod
+    def empty_email_none(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            val = value.strip()
+            return val if val else None
+        return value
 
 
 class AppointmentUpdate(ApiModel):
     status: AppointmentStatus | None = None
     scheduledStart: datetime | None = None
     scheduledEnd: datetime | None = None
-    customerName: str | None = Field(default=None, min_length=1, max_length=200)
-    customerPhone: str | None = Field(default=None, min_length=1, max_length=100)
+    customerName: str | None = Field(default=None, max_length=200)
+    customerPhone: str | None = Field(default=None, max_length=100)
     customerEmail: EmailStr | None = None
+
+    @field_validator("customerName", "customerPhone", mode="before")
+    @classmethod
+    def empty_contact_none(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            val = value.strip()
+            return val if val else None
+        return value
+
+    @field_validator("customerEmail", mode="before")
+    @classmethod
+    def empty_email_none(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            val = value.strip()
+            return val if val else None
+        return value
 
 
 class ConversationCreate(ApiModel):

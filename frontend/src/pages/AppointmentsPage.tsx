@@ -1,6 +1,6 @@
 import { CalendarPlus, Check, Clock, Plus, X } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
-import { Badge, Button, Card, Empty, Field, Input, PageHeader, Select } from '../components/ui';
+import { Badge, Button, Card, Empty, Field, Input, Notice, PageHeader, Select } from '../components/ui';
 import { api, formatDate } from '../lib/api';
 import type { Appointment, AppointmentStatus, Customer } from '../types';
 
@@ -8,12 +8,18 @@ const statuses: AppointmentStatus[] = ['PENDING', 'CONFIRMED', 'CANCELLED', 'COM
 const tone = (s: AppointmentStatus) =>
   s === 'CONFIRMED' || s === 'COMPLETED' ? 'green' : s === 'PENDING' ? 'amber' : s === 'CANCELLED' ? 'red' : 'neutral';
 
+type BusinessHour = { dayOfWeek: string; opensAt: string; closesAt: string };
+
 export function AppointmentsPage() {
   const [items, setItems] = useState<Appointment[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [hours, setHours] = useState<BusinessHour[]>([]);
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState('');
   const [form, setForm] = useState({ customerId: '', scheduledStart: '' });
+  const [error, setError] = useState('');
+  const [actionError, setActionError] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const load = () =>
     api<{ appointments: Appointment[] }>(`/appointments?limit=100${filter ? `&status=${filter}` : ''}`).then((r) =>
@@ -26,25 +32,46 @@ export function AppointmentsPage() {
 
   useEffect(() => {
     api<{ customers: Customer[] }>('/customers?limit=100').then((r) => setCustomers(r.customers));
+    api<{ hours: BusinessHour[] }>('/business/hours')
+      .then((r) => setHours(r.hours))
+      .catch(() => {});
   }, []);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    await api('/appointments', {
-      method: 'POST',
-      body: JSON.stringify({
-        customerId: form.customerId,
-        scheduledStart: new Date(form.scheduledStart).toISOString(),
-      }),
-    });
-    setOpen(false);
-    setForm({ customerId: '', scheduledStart: '' });
-    await load();
+    setError('');
+    setSaving(true);
+    try {
+      if (!form.scheduledStart) {
+        setError('Please choose an appointment date and time.');
+        return;
+      }
+      const startIso = new Date(form.scheduledStart).toISOString();
+      await api('/appointments', {
+        method: 'POST',
+        body: JSON.stringify({
+          customerId: form.customerId,
+          scheduledStart: startIso,
+        }),
+      });
+      setOpen(false);
+      setForm({ customerId: '', scheduledStart: '' });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to schedule appointment.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const update = async (id: string, status: AppointmentStatus) => {
-    await api(`/appointments/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) });
-    await load();
+    setActionError('');
+    try {
+      await api(`/appointments/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) });
+      await load();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Failed to update appointment.');
+    }
   };
 
   return (
@@ -53,7 +80,12 @@ export function AppointmentsPage() {
         title="Appointments"
         description="Review, schedule, and manage website customer appointments."
         action={
-          <Button onClick={() => setOpen(!open)}>
+          <Button
+            onClick={() => {
+              setOpen(!open);
+              setError('');
+            }}
+          >
             {open ? <X size={17} /> : <Plus size={17} />} {open ? 'Close' : 'New appointment'}
           </Button>
         }
@@ -61,9 +93,36 @@ export function AppointmentsPage() {
       {open && (
         <Card className="inline-create">
           <form onSubmit={submit}>
+            {error && <Notice kind="error">{error}</Notice>}
+            {hours.length > 0 ? (
+              <div
+                style={{
+                  padding: '0.6rem 0.85rem',
+                  marginBottom: '1rem',
+                  background: 'rgba(0,0,0,0.03)',
+                  border: '1px solid rgba(0,0,0,0.08)',
+                  borderRadius: '6px',
+                  fontSize: '0.875rem',
+                  lineHeight: '1.4',
+                }}
+              >
+                <strong>Operating hours:</strong>{' '}
+                {hours
+                  .map((h) => `${h.dayOfWeek.slice(0, 3)}: ${h.opensAt.slice(0, 5)}–${h.closesAt.slice(0, 5)}`)
+                  .join(', ')}
+              </div>
+            ) : (
+              <Notice kind="info">
+                No weekly hours have been configured yet. Appointments cannot be scheduled outside operating hours.
+              </Notice>
+            )}
             <div className="form-grid">
               <Field label="Customer">
-                <Select value={form.customerId} onChange={(e) => setForm({ ...form, customerId: e.target.value })} required>
+                <Select
+                  value={form.customerId}
+                  onChange={(e) => setForm({ ...form, customerId: e.target.value })}
+                  required
+                >
                   <option value="">Select customer</option>
                   {customers.map((c) => (
                     <option value={c.id} key={c.id}>
@@ -81,13 +140,14 @@ export function AppointmentsPage() {
                 />
               </Field>
             </div>
-            <Button>
+            <Button disabled={saving}>
               <CalendarPlus size={17} />
-              Create appointment
+              {saving ? 'Scheduling...' : 'Create appointment'}
             </Button>
           </form>
         </Card>
       )}
+      {actionError && <Notice kind="error">{actionError}</Notice>}
       <Card>
         <div className="table-toolbar">
           <div>
@@ -117,7 +177,13 @@ export function AppointmentsPage() {
                 </span>
                 <span>
                   <strong>{formatDate(item.scheduledStart)}</strong>
-                  <small>to {new Date(item.scheduledEnd).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</small>
+                  <small>
+                    to{' '}
+                    {new Date(item.scheduledEnd).toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </small>
                 </span>
                 <span>
                   <Badge tone={tone(item.status)}>{item.status}</Badge>

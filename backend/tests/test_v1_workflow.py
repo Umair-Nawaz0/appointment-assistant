@@ -85,6 +85,15 @@ async def test_v1_workflow_endpoints(client: httpx.AsyncClient):
     )
     assert val_date.status_code == 200
 
+    # Outside operating hours (02:00)
+    val_out_hours = await client.get(
+        f"/api/v1/appointments/validate-date?business_id={business_id}&date={future_date}&time=02:00",
+        headers=headers,
+    )
+    assert val_out_hours.status_code == 200
+    assert val_out_hours.json()["valid"] is False
+    assert val_out_hours.json()["reason"] == "OUTSIDE_BUSINESS_HOURS"
+
     # Past date validation
     past_val = await client.get(
         f"/api/v1/appointments/validate-date?business_id={business_id}&date=2020-01-01",
@@ -100,6 +109,43 @@ async def test_v1_workflow_endpoints(client: httpx.AsyncClient):
     )
     assert avail.status_code == 200
     slots = avail.json()["available_slots"]
+
+    # Reject booking on closed day (Saturday)
+    now_utc = datetime.now(timezone.utc)
+    days_to_sat = (5 - now_utc.weekday()) % 7
+    if days_to_sat == 0:
+        days_to_sat = 7
+    saturday_date = (now_utc + timedelta(days=days_to_sat)).strftime("%Y-%m-%d")
+    closed_book = await client.post(
+        "/api/v1/appointments/book",
+        headers=headers,
+        json={
+            "business_id": business_id,
+            "date": saturday_date,
+            "time": "10:00",
+            "customer_name": "Test Customer",
+            "customer_phone": "+1999888777",
+        },
+    )
+    assert closed_book.status_code == 200
+    assert closed_book.json()["success"] is False
+    assert closed_book.json()["code"] == "BUSINESS_CLOSED"
+
+    # Reject booking outside business hours (02:00)
+    outside_book = await client.post(
+        "/api/v1/appointments/book",
+        headers=headers,
+        json={
+            "business_id": business_id,
+            "date": future_date,
+            "time": "02:00",
+            "customer_name": "Test Customer",
+            "customer_phone": "+1999888777",
+        },
+    )
+    assert outside_book.status_code == 200
+    assert outside_book.json()["success"] is False
+    assert outside_book.json()["code"] == "OUTSIDE_BUSINESS_HOURS"
 
     # 7. Book appointment if slots exist
     if slots:
