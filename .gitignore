@@ -4,6 +4,10 @@
 .env.local
 !.env.example
 
+# OAuth credentials (contain encrypted tokens)
+credentials/*.json
+!credentials/.gitkeep
+
 # Dependencies
 node_modules/
 frontend/node_modules/

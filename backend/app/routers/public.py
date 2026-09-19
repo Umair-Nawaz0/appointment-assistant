@@ -183,25 +183,32 @@ async def public_chat(payload: PublicChatRequest, request: Request) -> dict[str,
                 clean_msg,
             )
 
-    # 3. Attempt n8n Webhook forward
-    n8n_url = "http://127.0.0.1:5678/webhook/chat"
+    # 3. Attempt n8n Webhook forward (try workflow-specific path first, then generic)
+    n8n_urls = [
+        "http://127.0.0.1:5678/webhook/ApptAssistant01/webhook/chat",
+        "http://127.0.0.1:5678/webhook/chat",
+    ]
     n8n_response_data: dict[str, Any] | None = None
+
+    webhook_body = {
+        "business_id": str(business_id),
+        "conversation_id": str(conversation_id),
+        "message": clean_msg,
+        "customer_name": payload.customer_name,
+        "customer_phone": payload.customer_phone,
+        "customer_email": payload.customer_email,
+    }
 
     try:
         async with httpx.AsyncClient(timeout=25.0) as http_client:
-            resp = await http_client.post(
-                n8n_url,
-                json={
-                    "business_id": str(business_id),
-                    "conversation_id": str(conversation_id),
-                    "message": clean_msg,
-                    "customer_name": payload.customer_name,
-                    "customer_phone": payload.customer_phone,
-                    "customer_email": payload.customer_email,
-                },
-            )
-            if resp.status_code == 200:
-                n8n_response_data = resp.json()
+            for n8n_url in n8n_urls:
+                try:
+                    resp = await http_client.post(n8n_url, json=webhook_body)
+                    if resp.status_code == 200:
+                        n8n_response_data = resp.json()
+                        break
+                except Exception:
+                    continue
     except Exception as e:
         logger.warning("n8n webhook call failed, falling back to direct assistant engine: %s", e)
 

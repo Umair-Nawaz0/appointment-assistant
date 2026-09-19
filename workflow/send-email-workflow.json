@@ -1,0 +1,274 @@
+{
+  "id": "IQq90vT3KGJEsOWs",
+  "name": "AI Meeting Scheduler - Freelancer Gmail Confirmation",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            { "name": "client_name", "type": "string" },
+            { "name": "client_email", "type": "string" },
+            { "name": "meeting_topic", "type": "string" },
+            { "name": "start_time", "type": "string" },
+            { "name": "timezone", "type": "string" },
+            { "name": "duration_minutes", "type": "number" },
+            { "name": "zoom_join_url", "type": "string" },
+            { "name": "zoom_meeting_id", "type": "string" },
+            { "name": "zoom_password", "type": "string" },
+            { "name": "agenda", "type": "string" },
+            { "name": "meeting_created", "type": "boolean" },
+            { "name": "calendar_event_created", "type": "boolean" }
+          ]
+        }
+      },
+      "id": "1b03aa54-0c40-4fac-aabf-e4dff3666183",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -900,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalize legacy and current aliases into a stable freelancer-to-client email contract.\nconst source = ($json.query && typeof $json.query === 'object' && !Array.isArray($json.query))\n  ? $json.query\n  : (($json.body && typeof $json.body === 'object' && !Array.isArray($json.body))\n    ? $json.body\n    : ($json ?? {}));\nconst text = (value) => value == null ? '' : String(value).trim();\nconst env = typeof $env === 'object' && $env ? $env : {};\nconst startValue = text(source.start_time ?? source.startTime);\nconst parsedStart = startValue ? new Date(startValue) : null;\nconst timezone = text(source.timezone ?? source.time_zone) || 'Asia/Karachi';\nlet meetingDate = text(source.meeting_date ?? source.meetingDate ?? source.date);\nlet meetingTime = text(source.meeting_time ?? source.meetingTime ?? source.time);\n\nif ((!meetingDate || !meetingTime) && parsedStart && !Number.isNaN(parsedStart.getTime()) && timezone) {\n  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {\n    timeZone: timezone,\n    year: 'numeric',\n    month: '2-digit',\n    day: '2-digit',\n    hour: '2-digit',\n    minute: '2-digit',\n    hourCycle: 'h23'\n  }).formatToParts(parsedStart).filter(part => part.type !== 'literal').map(part => [part.type, part.value]));\n  meetingDate ||= parts.year + '-' + parts.month + '-' + parts.day;\n  meetingTime ||= parts.hour + ':' + parts.minute;\n}\n\nconst request = {\n  host_name: text(source.host_name ?? source.hostName ?? source.freelancer_name ?? source.freelancerName ?? source.consultant_name ?? source.consultantName ?? env.FREELANCER_NAME ?? env.COMPANY_NAME) || 'Meeting Host',\n  client_name: text(source.client_name ?? source.clientName ?? source.customer_name ?? source.customerName),\n  host_email: text(source.host_email ?? source.hostEmail ?? source.freelancer_email ?? source.freelancerEmail).toLowerCase(),\n  client_email: text(source.client_email ?? source.clientEmail ?? source.customer_email ?? source.customerEmail).toLowerCase(),\n  meeting_topic: text(source.meeting_topic ?? source.meeting_title ?? source.topic ?? source.title),\n  agenda: text(source.agenda ?? source.meeting_agenda ?? source.meetingAgenda ?? source.description),\n  business_name: text(source.business_name ?? source.businessName),\n  meeting_date: meetingDate,\n  meeting_time: meetingTime,\n  start_time: startValue,\n  timezone,\n  duration: Number(source.duration ?? source.duration_minutes ?? source.durationMinutes ?? 30),\n  zoom_join_url: text(source.zoom_join_url ?? source.join_url ?? source.meetingLink),\n  zoom_meeting_id: text(source.zoom_meeting_id ?? source.meeting_id ?? source.id),\n  zoom_password: text(source.zoom_password ?? source.password),\n  appointment_id: text(source.appointment_id ?? source.appointmentId ?? source.booking_id ?? source.bookingId),\n  calendar_event_created: source.calendar_event_created === true,\n  meeting_created: source.meeting_created !== false,\n  email_type: text(source.email_type ?? source.emailType) || 'meeting_confirmation',\n  branding: {\n    company_name: text(source.company_name ?? source.companyName),\n    company_website: text(source.company_website ?? source.companyWebsite),\n    support_email: text(source.company_support_email ?? source.support_email ?? source.supportEmail),\n    logo_url: text(source.logo_url ?? source.logoUrl),\n    primary_color: text(source.primary_color ?? source.primaryColor),\n    footer_text: text(source.footer_text ?? source.footerText)\n  },\n  attach_ics: source.attach_ics ?? source.attachIcs,\n  future_actions: {\n    reschedule_url: text(source.reschedule_url ?? source.rescheduleUrl),\n    cancel_url: text(source.cancel_url ?? source.cancelUrl)\n  }\n};\n\nconst errors = [];\nconst emailPattern = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\nif (!emailPattern.test(request.client_email)) errors.push({ field: 'client_email', message: 'A valid client_email is required.' });\nfor (const field of ['client_name', 'meeting_topic', 'meeting_date', 'meeting_time', 'timezone', 'zoom_join_url', 'zoom_meeting_id']) {\n  if (!request[field]) errors.push({ field, message: field + ' is required.' });\n}\nif (!Number.isFinite(request.duration) || request.duration <= 0) errors.push({ field: 'duration', message: 'duration must be a positive number.' });\nif (request.zoom_join_url && !/^https:\\/\\//i.test(request.zoom_join_url)) errors.push({ field: 'zoom_join_url', message: 'zoom_join_url must be an HTTPS URL.' });\n\nreturn [{ json: { valid: errors.length === 0, errors, request } }];"
+      },
+      "id": "23472a8f-f75c-4225-8cb6-a3f7d4e36788",
+      "name": "Validate Meeting Email Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -680,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "6c3a163b-f12c-476e-b0dc-dde0ec47b8a0",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f465d42b-d874-4b2b-89ce-9ed26ed282e5",
+      "name": "Email Data Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -460,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Resolve presentation settings and prepare a native n8n binary .ics attachment for Gmail.\nconst data = $('Validate Meeting Email Data').item.json.request;\nconst text = (value) => value == null ? '' : String(value).trim();\nconst env = typeof $env === 'object' && $env ? $env : {};\nconst primaryColorCandidate = text(data.branding.primary_color || env.PRIMARY_COLOR);\nconst primaryColor = /^#[0-9a-f]{6}$/i.test(primaryColorCandidate) ? primaryColorCandidate : '#2563eb';\nconst config = {\n  company_name: text(data.branding.company_name || data.business_name || env.COMPANY_NAME) || data.host_name,\n  company_website: text(data.branding.company_website || env.COMPANY_WEBSITE),\n  support_email: text(data.branding.support_email || env.COMPANY_SUPPORT_EMAIL),\n  logo_url: text(data.branding.logo_url || env.LOGO_URL),\n  primary_color: primaryColor,\n  footer_text: text(data.branding.footer_text || env.COMPANY_FOOTER_TEXT),\n  attach_ics: data.attach_ics == null ? String(env.EMAIL_ATTACH_ICS ?? 'true').toLowerCase() !== 'false' : Boolean(data.attach_ics)\n};\n\nconst pad = value => String(value).padStart(2, '0');\nconst compactUtc = date => date.toISOString().replace(/[-:]/g, '').replace(/\\.\\d{3}Z$/, 'Z');\nconst escapeIcs = value => String(value ?? '').replace(/\\\\/g, '\\\\\\\\').replace(/\\n/g, '\\\\n').replace(/,/g, '\\\\,').replace(/;/g, '\\\\;');\nlet startLine;\nlet endLine;\nconst parsedStart = data.start_time ? new Date(data.start_time) : null;\nif (parsedStart && !Number.isNaN(parsedStart.getTime())) {\n  startLine = 'DTSTART:' + compactUtc(parsedStart);\n  endLine = 'DTEND:' + compactUtc(new Date(parsedStart.getTime() + data.duration * 60000));\n} else {\n  const localStart = new Date(data.meeting_date + 'T' + data.meeting_time + ':00Z');\n  const localEnd = new Date(localStart.getTime() + data.duration * 60000);\n  const compactLocal = date => date.getUTCFullYear() + pad(date.getUTCMonth() + 1) + pad(date.getUTCDate()) + 'T' + pad(date.getUTCHours()) + pad(date.getUTCMinutes()) + pad(date.getUTCSeconds());\n  startLine = 'DTSTART;TZID=' + data.timezone + ':' + compactLocal(localStart);\n  endLine = 'DTEND;TZID=' + data.timezone + ':' + compactLocal(localEnd);\n}\nconst uidDomain = config.company_website ? config.company_website.replace(/^https?:\\/\\//, '').split('/')[0] : 'meeting.local';\nconst organizer = data.host_email ? 'ORGANIZER;CN=' + escapeIcs(data.host_name) + ':mailto:' + escapeIcs(data.host_email) : '';\nconst ics = [\n  'BEGIN:VCALENDAR',\n  'VERSION:2.0',\n  'PRODID:-//' + escapeIcs(config.company_name) + '//Meeting Confirmation//EN',\n  'CALSCALE:GREGORIAN',\n  'METHOD:REQUEST',\n  'BEGIN:VEVENT',\n  'UID:' + escapeIcs(data.appointment_id || data.zoom_meeting_id) + '@' + escapeIcs(uidDomain),\n  'DTSTAMP:' + compactUtc(new Date()),\n  startLine,\n  endLine,\n  organizer,\n  'ATTENDEE;CN=' + escapeIcs(data.client_name) + ';RSVP=TRUE:mailto:' + escapeIcs(data.client_email),\n  'SUMMARY:' + escapeIcs(data.meeting_topic),\n  'DESCRIPTION:' + escapeIcs((data.agenda || data.meeting_topic) + '\\n\\nJoin Zoom: ' + data.zoom_join_url),\n  'LOCATION:' + escapeIcs(data.zoom_join_url),\n  'URL:' + escapeIcs(data.zoom_join_url),\n  'STATUS:CONFIRMED',\n  'END:VEVENT',\n  'END:VCALENDAR'\n].filter(Boolean).join('\\r\\n');\nconst filename = 'meeting-' + data.zoom_meeting_id.replace(/[^a-z0-9_-]/gi, '-') + '.ics';\nconst contentBase64 = Buffer.from(ics, 'utf8').toString('base64');\n\nreturn [{\n  json: {\n    data,\n    config,\n    generated_at: new Date().toISOString(),\n    calendar_attachment: {\n      binary_property: 'calendar_invite',\n      filename,\n      content_type: 'text/calendar; charset=utf-8; method=REQUEST',\n      content_base64: contentBase64\n    }\n  },\n  binary: {\n    calendar_invite: {\n      data: contentBase64,\n      mimeType: 'text/calendar',\n      fileName: filename,\n      fileExtension: 'ics'\n    }\n  }\n}];"
+      },
+      "id": "fc5910ec-fd09-4523-a52e-21dbec5c2fab",
+      "name": "Prepare Email Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -240,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build one friendly, professional email from the freelancer to the client.\nconst input = $input.item;\nconst prepared = input.json;\nconst { data, config } = prepared;\nconst escapeHtml = value => String(value ?? '').replace(/[&<>\"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' })[char]);\nconst preserveLines = value => escapeHtml(value).replace(/\\r?\\n/g, '<br>');\nconst safeUrl = value => /^https:\\/\\//i.test(String(value ?? '')) ? escapeHtml(value) : '';\nconst displayDate = /^\\d{4}-\\d{2}-\\d{2}$/.test(data.meeting_date)\n  ? new Intl.DateTimeFormat('en-US', { dateStyle: 'full', timeZone: 'UTC' }).format(new Date(data.meeting_date + 'T00:00:00Z'))\n  : data.meeting_date;\nconst discussionText = data.agenda || ('We’ll use our time to discuss ' + data.meeting_topic + ', answer your questions, and agree on the best next steps.');\n\nconst detailRow = (label, value) => value === '' || value == null\n  ? ''\n  : '<tr><td style=\"padding:8px 0;color:#64748b;width:40%;font-size:14px;\">' + escapeHtml(label) + '</td><td style=\"padding:8px 0;color:#0f172a;font-weight:600;font-size:14px;\">' + escapeHtml(value) + '</td></tr>';\nconst brand = () => {\n  const logo = config.logo_url && safeUrl(config.logo_url) ? '<img src=\"' + safeUrl(config.logo_url) + '\" width=\"132\" alt=\"' + escapeHtml(config.company_name) + '\" style=\"display:block;max-width:132px;height:auto;border:0;\">' : '';\n  return '<tr><td style=\"padding:24px 38px;background:#ffffff;border-bottom:1px solid #e2e8f0;\">' + (logo || '<div style=\"font-size:18px;font-weight:800;color:#0f172a;\">' + escapeHtml(config.company_name) + '</div>') + '</td></tr>';\n};\nconst meetingCard = '<div style=\"border:1px solid #dbe4f0;border-radius:12px;padding:20px 22px;margin:24px 0;background:#ffffff;\"><div style=\"font-size:19px;font-weight:800;color:#0f172a;margin-bottom:10px;\">' + escapeHtml(data.meeting_topic) + '</div><table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\">' +\n  detailRow('Date', displayDate) +\n  detailRow('Time', data.meeting_time + ' (' + data.timezone + ')') +\n  detailRow('Duration', data.duration + ' minutes') +\n  detailRow('With', data.host_name) +\n  detailRow('Meeting ID', data.zoom_meeting_id) +\n  detailRow('Password', data.zoom_password) +\n  '</table></div>';\nconst joinSection = '<table role=\"presentation\" cellspacing=\"0\" cellpadding=\"0\" style=\"margin:0 0 18px;\"><tr><td><a href=\"' + safeUrl(data.zoom_join_url) + '\" style=\"display:inline-block;padding:14px 24px;border-radius:9px;text-decoration:none;font-size:15px;font-weight:700;background:' + escapeHtml(config.primary_color) + ';color:#ffffff;\">Join Zoom Meeting</a></td></tr></table><p style=\"margin:0 0 24px;font-size:13px;line-height:1.6;color:#64748b;word-break:break-all;\">If the button does not work, copy this link:<br><a href=\"' + safeUrl(data.zoom_join_url) + '\" style=\"color:' + escapeHtml(config.primary_color) + ';\">' + escapeHtml(data.zoom_join_url) + '</a></p>';\nconst discussion = '<div style=\"padding:19px 20px;background:#f8fafc;border-radius:11px;border-left:4px solid ' + escapeHtml(config.primary_color) + ';margin:0 0 24px;\"><div style=\"font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#64748b;margin-bottom:8px;\">What we’ll discuss</div><div style=\"font-size:15px;line-height:1.7;color:#334155;\">' + preserveLines(discussionText) + '</div></div>';\nconst footer = () => {\n  const support = config.support_email ? ' Need help? <a href=\"mailto:' + escapeHtml(config.support_email) + '\" style=\"color:#cbd5e1;\">' + escapeHtml(config.support_email) + '</a>.' : '';\n  const website = config.company_website && safeUrl(config.company_website) ? '<a href=\"' + safeUrl(config.company_website) + '\" style=\"color:#cbd5e1;\">' + escapeHtml(config.company_name) + '</a>' : escapeHtml(config.company_name);\n  return (config.footer_text ? escapeHtml(config.footer_text) + '<br>' : '') + website + '.' + support;\n};\nconst content = '<div style=\"font-size:12px;font-weight:800;letter-spacing:.11em;text-transform:uppercase;color:' + escapeHtml(config.primary_color) + ';margin-bottom:15px;\">Meeting confirmed</div><h1 style=\"margin:0 0 14px;font-size:29px;line-height:1.25;\">I’m looking forward to speaking with you</h1><p style=\"margin:0 0 12px;font-size:16px;line-height:1.7;color:#475569;\">Hi ' + escapeHtml(data.client_name) + ',</p><p style=\"margin:0 0 20px;font-size:16px;line-height:1.7;color:#475569;\">Thanks for scheduling time with me. Your meeting is confirmed, and I’m looking forward to a useful conversation about <strong>' + escapeHtml(data.meeting_topic) + '</strong>.</p>' + discussion + meetingCard + joinSection + '<div style=\"padding:17px 19px;background:#eff6ff;border-radius:10px;color:#1e3a8a;font-size:14px;line-height:1.65;\"><strong>A quick reminder</strong><br>Please keep this email handy and join a few minutes early. The calendar invitation is attached for convenience.</div><p style=\"margin:26px 0 0;font-size:15px;line-height:1.7;color:#475569;\">See you soon,<br><strong style=\"color:#0f172a;\">' + escapeHtml(data.host_name) + '</strong></p>';\nconst html = '<!doctype html><html><head><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><style>@media only screen and (max-width:620px){.shell{width:100%!important}.body{padding:28px 20px!important}.join a{display:block!important;text-align:center!important}}</style></head><body style=\"margin:0;padding:0;background:#eef2f7;font-family:Inter,Arial,Helvetica,sans-serif;color:#0f172a;\"><table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"background:#eef2f7;padding:30px 12px;\"><tr><td align=\"center\"><table role=\"presentation\" class=\"shell\" width=\"620\" cellspacing=\"0\" cellpadding=\"0\" style=\"width:100%;max-width:620px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 12px 36px rgba(15,23,42,.10);\"><tr><td style=\"height:7px;background:' + escapeHtml(config.primary_color) + ';\"></td></tr>' + brand() + '<tr><td class=\"body\" style=\"padding:38px 42px;\">' + content + '</td></tr><tr><td style=\"padding:23px 38px;background:#0f172a;color:#94a3b8;font-size:12px;line-height:1.7;text-align:center;\">' + footer() + '</td></tr></table></td></tr></table></body></html>';\n\nreturn [{\n  json: {\n    ...prepared,\n    client_template: {\n      subject: 'Your Meeting is Confirmed 🎉',\n      html\n    },\n    template_version: '4.0.0-gmail-freelancer',\n    email_provider: 'gmail'\n  },\n  binary: input.binary\n}];"
+      },
+      "id": "69692b7d-a019-4458-8b84-e95152b2997c",
+      "name": "Build Friendly Client Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Expose the message fields consumed by the native n8n Gmail node.\nconst input = $input.item;\nconst prepared = input.json;\nreturn [{\n  json: {\n    ...prepared,\n    client_email_message: {\n      sender_name: prepared.data.host_name,\n      recipient: prepared.data.client_email,\n      subject: prepared.client_template.subject,\n      html: prepared.client_template.html,\n      attachment_binary_property: prepared.config.attach_ics ? prepared.calendar_attachment.binary_property : '',\n      prepared_at: prepared.generated_at\n    }\n  },\n  binary: input.binary\n}];"
+      },
+      "id": "f92ac60b-19b5-4809-85aa-4fb224305bd6",
+      "name": "Prepare Client Gmail Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{ $json.client_email_message.recipient }}",
+        "subject": "={{ $json.client_email_message.subject }}",
+        "emailType": "html",
+        "message": "={{ $json.client_email_message.html }}",
+        "options": "={{ { appendAttribution: false, senderName: $json.client_email_message.sender_name, ...($json.config.attach_ics ? { attachmentsUi: { attachmentsBinary: [{ property: $json.client_email_message.attachment_binary_property }] } } : {}) } }}"
+      },
+      "id": "ca96cc18-dfa2-426f-bd5f-24e2f1fe10f1",
+      "name": "Send Client Confirmation via Gmail",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        720,
+        -100
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "IQncxnlqnLgtyFI8",
+          "name": "Gmail account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalize the native Gmail response without failing the completed meeting.\nconst response = $json ?? {};\nconst prepared = $('Prepare Client Gmail Message').item.json;\nconst completedAt = new Date();\nconst startedAt = new Date(prepared.client_email_message.prepared_at);\nconst gmailError = response.error?.message ?? response.error ?? '';\nconst sent = !gmailError && Boolean(response.id || response.threadId);\nconst client = {\n  sent,\n  provider: 'gmail',\n  sender: 'authenticated freelancer Gmail account',\n  sender_name: prepared.client_email_message.sender_name,\n  recipient: prepared.client_email_message.recipient,\n  status_code: sent ? 200 : 500,\n  provider_message_id: String(response.id ?? ''),\n  thread_id: String(response.threadId ?? ''),\n  error: sent ? null : String(gmailError || 'Gmail did not return a message ID. Check the Gmail credential and execution details.'),\n  provider_response: response,\n  prepared_at: prepared.client_email_message.prepared_at,\n  completed_at: completedAt.toISOString(),\n  elapsed_ms_since_preparation: Number.isNaN(startedAt.getTime()) ? null : completedAt.getTime() - startedAt.getTime(),\n  execution_id: typeof $execution !== 'undefined' ? $execution.id : null,\n  calendar_attachment_sent: sent && prepared.config.attach_ics\n};\nif (!sent) console.error('Gmail meeting confirmation failed', { recipient_type: 'client', ...client, timestamp: completedAt.toISOString() });\nconst failures = sent ? [] : [{\n  recipient: 'client',\n  email: client.recipient,\n  error: client.error,\n  status_code: client.status_code,\n  timestamp: client.completed_at,\n  provider_response: client.provider_response\n}];\n\nreturn [{ json: {\n  success: true,\n  meeting_created: prepared.data.meeting_created,\n  calendar_event_created: prepared.data.calendar_event_created,\n  host_email_sent: false,\n  host_email_skipped: true,\n  client_email_sent: sent,\n  email_sender: 'authenticated freelancer Gmail account',\n  email_recipient: prepared.data.client_email,\n  zoom_join_url: prepared.data.zoom_join_url,\n  meeting_id: prepared.data.zoom_meeting_id,\n  message: sent\n    ? 'Meeting created successfully and the client confirmation was sent from the freelancer Gmail account.'\n    : 'Meeting created successfully, but the client Gmail confirmation failed.',\n  email_failures: failures,\n  email_results: { client },\n  email_template_version: prepared.template_version,\n  calendar_attachment_prepared: Boolean(prepared.calendar_attachment?.content_base64),\n  calendar_attachment_sent: client.calendar_attachment_sent,\n  completed_at: completedAt.toISOString()\n} }];"
+      },
+      "id": "6ae7589d-b87c-458b-a9ad-1b262c5fbd00",
+      "name": "Return Client Email Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: {\n  success: false,\n  meeting_created: $json.request?.meeting_created ?? true,\n  calendar_event_created: $json.request?.calendar_event_created ?? true,\n  host_email_sent: false,\n  host_email_skipped: true,\n  client_email_sent: false,\n  email_sender: 'authenticated freelancer Gmail account',\n  email_recipient: $json.request?.client_email ?? null,\n  zoom_join_url: $json.request?.zoom_join_url ?? null,\n  meeting_id: $json.request?.zoom_meeting_id ?? null,\n  message: 'The client confirmation was not sent because the email payload is invalid.',\n  validation_errors: $json.errors\n} }];"
+      },
+      "id": "30a4fbac-2690-4623-8076-aed173812fbc",
+      "name": "Return Email Validation Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -240,
+        140
+      ]
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Validate Meeting Email Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Meeting Email Data": {
+      "main": [
+        [
+          {
+            "node": "Email Data Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Data Valid?": {
+      "main": [
+        [
+          {
+            "node": "Prepare Email Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Email Validation Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Email Data": {
+      "main": [
+        [
+          {
+            "node": "Build Friendly Client Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Friendly Client Email": {
+      "main": [
+        [
+          {
+            "node": "Prepare Client Gmail Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Client Gmail Message": {
+      "main": [
+        [
+          {
+            "node": "Send Client Confirmation via Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Client Confirmation via Gmail": {
+      "main": [
+        [
+          {
+            "node": "Return Client Email Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false,
+  "versionId": "86cb77bb-3be0-4200-8bd4-c4fca061c4df",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": [
+    {
+      "id": "3ab0e80d-f695-44bf-82fd-314287d31030",
+      "name": "email"
+    }
+  ]
+}

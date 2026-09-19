@@ -81,6 +81,12 @@ if [ -n "${n8n_container}" ]; then
       echo "✓ Imported Google Gemini API credential template into n8n"
     fi
 
+    # Import Gmail OAuth2 credential if available
+    if [ -f "${PROJECT_DIR}/credentials/gmail-oauth2.json" ]; then
+      docker exec "${n8n_container}" n8n import:credentials --input=/bootstrap/credentials/gmail-oauth2.json >/dev/null 2>&1 || true
+      echo "✓ Imported Gmail OAuth2 credential into n8n"
+    fi
+
     # Import website workflow (ensuring valid n8n entity ID inside container without modifying host source file)
     if [ -f "${PROJECT_DIR}/workflow/website-workflow.json" ]; then
       docker exec "${n8n_container}" node -e "
