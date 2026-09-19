@@ -95,17 +95,7 @@ export function AppointmentsPage() {
           <form onSubmit={submit}>
             {error && <Notice kind="error">{error}</Notice>}
             {hours.length > 0 ? (
-              <div
-                style={{
-                  padding: '0.6rem 0.85rem',
-                  marginBottom: '1rem',
-                  background: 'rgba(0,0,0,0.03)',
-                  border: '1px solid rgba(0,0,0,0.08)',
-                  borderRadius: '6px',
-                  fontSize: '0.875rem',
-                  lineHeight: '1.4',
-                }}
-              >
+              <div className="hours-banner">
                 <strong>Operating hours:</strong>{' '}
                 {hours
                   .map((h) => `${h.dayOfWeek.slice(0, 3)}: ${h.opensAt.slice(0, 5)}–${h.closesAt.slice(0, 5)}`)
@@ -162,7 +152,7 @@ export function AppointmentsPage() {
           </Select>
         </div>
         {items.length ? (
-          <div className="data-table">
+          <div className="data-table appointments-table">
             <div className="table-row table-head">
               <span>Customer</span>
               <span>Schedule</span>

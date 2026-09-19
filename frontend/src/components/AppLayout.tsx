@@ -1,4 +1,4 @@
-import { Bot, CalendarDays, ChevronDown, Clock3, ContactRound, ExternalLink, LayoutDashboard, LogOut, Menu, MessageSquareText, Moon, Settings2, Sparkles, Store, Sun, X } from 'lucide-react';
+import { Bot, CalendarDays, ChevronDown, Clock3, ContactRound, ExternalLink, Home, LayoutDashboard, LogOut, Menu, MessageSquareText, Moon, Settings2, Sparkles, Store, Sun, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -24,6 +24,7 @@ export function AppLayout() {
   useEffect(() => {
     localStorage.setItem('ai_assistant_theme', theme);
     document.documentElement.setAttribute('data-theme', theme);
+    document.documentElement.style.colorScheme = theme;
   }, [theme]);
 
   const signOut = async () => {
@@ -32,7 +33,7 @@ export function AppLayout() {
   };
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell theme-${theme}`}>
       <button className="mobile-menu" onClick={() => setOpen(!open)} aria-label="Toggle navigation">
         {open ? <X /> : <Menu />}
       </button>
@@ -72,11 +73,17 @@ export function AppLayout() {
       </aside>
       <main className="main">
         <div className="topbar">
-          <Link to="/chat" target="_blank" rel="noopener noreferrer" className="topbar-patient-link" title="Open live patient chat interface">
-            <Bot size={15} />
-            <span>Patient Chat View</span>
-            <ExternalLink size={12} />
-          </Link>
+          <div className="topbar-left-actions">
+            <Link to="/" className="topbar-portal-link" title="Return to Portal Selection">
+              <Home size={14} />
+              <span>Portal Home</span>
+            </Link>
+            <Link to="/chat" target="_blank" rel="noopener noreferrer" className="topbar-patient-link" title="Open live patient chat interface">
+              <Bot size={15} />
+              <span>Patient Chat View</span>
+              <ExternalLink size={12} />
+            </Link>
+          </div>
           
           <div className="topbar-actions">
             <div className="admin-theme-switch" role="radiogroup" aria-label="Theme choice">
