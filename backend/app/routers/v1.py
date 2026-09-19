@@ -8,11 +8,14 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
+import logging
 from ..config import settings
 from ..db import execute, fetch, fetchrow, transaction
 from ..errors import AppError
+from ..mail import deliver_appointment_email
 from ..scheduling import validate_appointment_slot
 
+logger = logging.getLogger("v1_api")
 router = APIRouter(prefix="/api/v1", tags=["Workflow v1 API"])
 
 
@@ -816,3 +819,43 @@ async def cancel_appointment_v1(
         "status": "CANCELLED",
         "cancellation_reason": payload.cancellation_reason or "Customer requested cancellation.",
     }
+
+
+# ==============================================================================
+# 9. Send Appointment Confirmation Email (Integrated with Gmail & .env)
+# ==============================================================================
+
+class SendAppointmentEmailPayload(BaseModel):
+    recipient: str
+    subject: str
+    html: str
+    ics_base64: str | None = None
+    ics_filename: str | None = "appointment.ics"
+    sender_name: str | None = None
+    appointment_id: str | None = None
+
+
+@router.post("/appointments/send-confirmation-email")
+async def send_confirmation_email_endpoint(
+    payload: SendAppointmentEmailPayload,
+    x_api_key: str | None = Header(None),
+) -> dict[str, Any]:
+    _verify_api_key(x_api_key)
+    try:
+        result = await deliver_appointment_email(
+            to=payload.recipient,
+            subject=payload.subject,
+            html_body=payload.html,
+            ics_base64=payload.ics_base64,
+            ics_filename=payload.ics_filename,
+            sender_name=payload.sender_name,
+        )
+        return {"success": True, **result}
+    except Exception as e:
+        logger.error("Failed to send appointment confirmation email: %s", e)
+        return {
+            "success": False,
+            "error": str(e),
+            "recipient": payload.recipient,
+        }
+

@@ -688,6 +688,41 @@
         }
       },
       "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Workflow Config').first().json.backend_base_url + '/api/v1/appointments/send-confirmation-email' }}",
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-API-Key",
+              "value": "={{ $('Workflow Config').first().json.backend_api_key }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { recipient: $json.recipient, subject: $json.subject, html: $json.html, ics_base64: $json.ics_base64, ics_filename: $json.ics_filename, sender_name: $json.sender_name, appointment_id: $json.appointment_id } }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2880,
+        480
+      ],
+      "id": "e4f5a6b7-send-email-api-01",
+      "name": "Deliver Confirmation Email",
+      "onError": "continueRegularOutput"
     }
   ],
   "pinData": {},
@@ -946,7 +981,7 @@
       "main": [
         [
           {
-            "node": "Send Confirmation via Gmail",
+            "node": "Deliver Confirmation Email",
             "type": "main",
             "index": 0
           }
@@ -954,6 +989,11 @@
       ]
     },
     "Send Confirmation via Gmail": {
+      "main": [
+        []
+      ]
+    },
+    "Deliver Confirmation Email": {
       "main": [
         []
       ]

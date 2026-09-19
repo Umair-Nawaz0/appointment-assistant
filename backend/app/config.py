@@ -49,6 +49,13 @@ class Settings:
     smtp_user: str | None = os.getenv("SMTP_USER") or None
     smtp_password: str | None = os.getenv("SMTP_PASSWORD") or None
 
+    # Gmail Integration Settings
+    gmail_sender_email: str | None = os.getenv("GMAIL_SENDER_EMAIL") or os.getenv("GMAIL_USER") or None
+    gmail_api_secret_key: str | None = os.getenv("GMAIL_API_SECRET_KEY") or os.getenv("GMAIL_APP_PASSWORD") or None
+    gmail_client_id: str | None = os.getenv("GMAIL_CLIENT_ID") or None
+    gmail_client_secret: str | None = os.getenv("GMAIL_CLIENT_SECRET") or None
+    gmail_refresh_token: str | None = os.getenv("GMAIL_REFRESH_TOKEN") or None
+
     @property
     def production(self) -> bool:
         return self.environment == "production"
@@ -79,6 +86,19 @@ class Settings:
         return tuple(sorted(origins))
 
     def validate(self) -> None:
+        # Auto-configure Gmail SMTP if Gmail credentials are provided
+        if self.gmail_sender_email and self.gmail_api_secret_key:
+            if not self.smtp_host:
+                self.smtp_host = "smtp.gmail.com"
+                self.smtp_port = 465
+                self.smtp_secure = True
+                self.smtp_user = self.gmail_sender_email
+                self.smtp_password = self.gmail_api_secret_key.replace(" ", "")
+                if self.mail_mode == "console":
+                    self.mail_mode = "smtp"
+                if "no-reply@example.com" in self.mail_from:
+                    self.mail_from = f"Appointment Assistant <{self.gmail_sender_email}>"
+
         if self.mail_mode not in {"console", "smtp"}:
             raise RuntimeError("MAIL_MODE must be console or smtp")
         if self.mail_mode == "smtp" and not all((self.smtp_host, self.smtp_user, self.smtp_password)):

@@ -87,6 +87,12 @@ if [ -n "${n8n_container}" ]; then
       echo "✓ Imported Gmail OAuth2 credential into n8n"
     fi
 
+    # Import Gmail SMTP credential if available
+    if [ -f "${PROJECT_DIR}/credentials/gmail-smtp.json" ]; then
+      docker exec "${n8n_container}" n8n import:credentials --input=/bootstrap/credentials/gmail-smtp.json >/dev/null 2>&1 || true
+      echo "✓ Imported Gmail SMTP credential into n8n"
+    fi
+
     # Import website workflow (ensuring valid n8n entity ID inside container without modifying host source file)
     if [ -f "${PROJECT_DIR}/workflow/website-workflow.json" ]; then
       docker exec "${n8n_container}" node -e "
