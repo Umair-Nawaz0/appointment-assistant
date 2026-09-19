@@ -664,35 +664,8 @@
     },
     {
       "parameters": {
-        "authentication": "oAuth2",
-        "resource": "message",
-        "operation": "send",
-        "sendTo": "={{ $json.recipient }}",
-        "subject": "={{ $json.subject }}",
-        "emailType": "html",
-        "message": "={{ $json.html }}",
-        "options": "={{ { appendAttribution: false, senderName: $json.customer_name ? ($json.customer_name + ' - Appointment Confirmation') : 'Appointment Confirmation', attachmentsUi: { attachmentsBinary: [{ property: 'calendar_invite' }] } } }}"
-      },
-      "type": "n8n-nodes-base.gmail",
-      "typeVersion": 2.2,
-      "position": [
-        2880,
-        480
-      ],
-      "id": "c3d4e5f6-gmail-send-01",
-      "name": "Send Confirmation via Gmail",
-      "credentials": {
-        "gmailOAuth2": {
-          "id": "IQncxnlqnLgtyFI8",
-          "name": "Gmail account"
-        }
-      },
-      "onError": "continueRegularOutput"
-    },
-    {
-      "parameters": {
         "method": "POST",
-        "url": "={{ $('Workflow Config').first().json.backend_base_url + '/api/v1/appointments/send-confirmation-email' }}",
+        "url": "http://127.0.0.1:5678/webhook/TestSendEmail01/webhook/confirmation-email-agent",
         "sendHeaders": true,
         "specifyHeaders": "keypair",
         "headerParameters": {
@@ -709,7 +682,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ { recipient: $json.recipient, subject: $json.subject, html: $json.html, ics_base64: $json.ics_base64, ics_filename: $json.ics_filename, sender_name: $json.sender_name, appointment_id: $json.appointment_id } }}",
+        "jsonBody": "={{ { customer_email: $json.recipient, customer_name: $json.customer_name, service_name: $json.service_name || $json.subject, clinic_name: $json.clinic_name, appointment_date: $json.appointment_date, appointment_time: $json.appointment_time, appointment_id: $json.appointment_id, sender_email: 'sardarumairnawazkhan@gmail.com' } }}",
         "options": {
           "timeout": 30000
         }
@@ -986,11 +959,6 @@
             "index": 0
           }
         ]
-      ]
-    },
-    "Send Confirmation via Gmail": {
-      "main": [
-        []
       ]
     },
     "Deliver Confirmation Email": {

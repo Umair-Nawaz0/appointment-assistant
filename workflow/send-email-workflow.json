@@ -1,48 +1,101 @@
 {
-  "id": "IQq90vT3KGJEsOWs",
-  "name": "AI Meeting Scheduler - Freelancer Gmail Confirmation",
+  "id": "TestSendEmail01",
+  "name": "confirmation email agent",
+  "active": true,
   "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "confirmation-email-agent",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -900,
+        -80
+      ],
+      "id": "webhook-trigger-01",
+      "name": "Webhook"
+    },
     {
       "parameters": {
         "inputSource": "workflowInputs",
         "workflowInputs": {
           "values": [
-            { "name": "client_name", "type": "string" },
-            { "name": "client_email", "type": "string" },
-            { "name": "meeting_topic", "type": "string" },
-            { "name": "start_time", "type": "string" },
-            { "name": "timezone", "type": "string" },
-            { "name": "duration_minutes", "type": "number" },
-            { "name": "zoom_join_url", "type": "string" },
-            { "name": "zoom_meeting_id", "type": "string" },
-            { "name": "zoom_password", "type": "string" },
-            { "name": "agenda", "type": "string" },
-            { "name": "meeting_created", "type": "boolean" },
-            { "name": "calendar_event_created", "type": "boolean" }
+            {
+              "name": "customer_name",
+              "type": "string"
+            },
+            {
+              "name": "customer_email",
+              "type": "string"
+            },
+            {
+              "name": "service_name",
+              "type": "string"
+            },
+            {
+              "name": "appointment_date",
+              "type": "string"
+            },
+            {
+              "name": "appointment_time",
+              "type": "string"
+            },
+            {
+              "name": "clinic_name",
+              "type": "string"
+            },
+            {
+              "name": "location",
+              "type": "string"
+            },
+            {
+              "name": "duration_minutes",
+              "type": "number"
+            },
+            {
+              "name": "timezone",
+              "type": "string"
+            },
+            {
+              "name": "notes",
+              "type": "string"
+            },
+            {
+              "name": "template_type",
+              "type": "string"
+            },
+            {
+              "name": "appointment_id",
+              "type": "string"
+            }
           ]
         }
       },
-      "id": "1b03aa54-0c40-4fac-aabf-e4dff3666183",
-      "name": "When Executed by Another Workflow",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.1,
       "position": [
         -900,
-        0
-      ]
+        120
+      ],
+      "id": "exec-trigger-01",
+      "name": "When Executed by Another Workflow"
     },
     {
       "parameters": {
-        "jsCode": "// Normalize legacy and current aliases into a stable freelancer-to-client email contract.\nconst source = ($json.query && typeof $json.query === 'object' && !Array.isArray($json.query))\n  ? $json.query\n  : (($json.body && typeof $json.body === 'object' && !Array.isArray($json.body))\n    ? $json.body\n    : ($json ?? {}));\nconst text = (value) => value == null ? '' : String(value).trim();\nconst env = typeof $env === 'object' && $env ? $env : {};\nconst startValue = text(source.start_time ?? source.startTime);\nconst parsedStart = startValue ? new Date(startValue) : null;\nconst timezone = text(source.timezone ?? source.time_zone) || 'Asia/Karachi';\nlet meetingDate = text(source.meeting_date ?? source.meetingDate ?? source.date);\nlet meetingTime = text(source.meeting_time ?? source.meetingTime ?? source.time);\n\nif ((!meetingDate || !meetingTime) && parsedStart && !Number.isNaN(parsedStart.getTime()) && timezone) {\n  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {\n    timeZone: timezone,\n    year: 'numeric',\n    month: '2-digit',\n    day: '2-digit',\n    hour: '2-digit',\n    minute: '2-digit',\n    hourCycle: 'h23'\n  }).formatToParts(parsedStart).filter(part => part.type !== 'literal').map(part => [part.type, part.value]));\n  meetingDate ||= parts.year + '-' + parts.month + '-' + parts.day;\n  meetingTime ||= parts.hour + ':' + parts.minute;\n}\n\nconst request = {\n  host_name: text(source.host_name ?? source.hostName ?? source.freelancer_name ?? source.freelancerName ?? source.consultant_name ?? source.consultantName ?? env.FREELANCER_NAME ?? env.COMPANY_NAME) || 'Meeting Host',\n  client_name: text(source.client_name ?? source.clientName ?? source.customer_name ?? source.customerName),\n  host_email: text(source.host_email ?? source.hostEmail ?? source.freelancer_email ?? source.freelancerEmail).toLowerCase(),\n  client_email: text(source.client_email ?? source.clientEmail ?? source.customer_email ?? source.customerEmail).toLowerCase(),\n  meeting_topic: text(source.meeting_topic ?? source.meeting_title ?? source.topic ?? source.title),\n  agenda: text(source.agenda ?? source.meeting_agenda ?? source.meetingAgenda ?? source.description),\n  business_name: text(source.business_name ?? source.businessName),\n  meeting_date: meetingDate,\n  meeting_time: meetingTime,\n  start_time: startValue,\n  timezone,\n  duration: Number(source.duration ?? source.duration_minutes ?? source.durationMinutes ?? 30),\n  zoom_join_url: text(source.zoom_join_url ?? source.join_url ?? source.meetingLink),\n  zoom_meeting_id: text(source.zoom_meeting_id ?? source.meeting_id ?? source.id),\n  zoom_password: text(source.zoom_password ?? source.password),\n  appointment_id: text(source.appointment_id ?? source.appointmentId ?? source.booking_id ?? source.bookingId),\n  calendar_event_created: source.calendar_event_created === true,\n  meeting_created: source.meeting_created !== false,\n  email_type: text(source.email_type ?? source.emailType) || 'meeting_confirmation',\n  branding: {\n    company_name: text(source.company_name ?? source.companyName),\n    company_website: text(source.company_website ?? source.companyWebsite),\n    support_email: text(source.company_support_email ?? source.support_email ?? source.supportEmail),\n    logo_url: text(source.logo_url ?? source.logoUrl),\n    primary_color: text(source.primary_color ?? source.primaryColor),\n    footer_text: text(source.footer_text ?? source.footerText)\n  },\n  attach_ics: source.attach_ics ?? source.attachIcs,\n  future_actions: {\n    reschedule_url: text(source.reschedule_url ?? source.rescheduleUrl),\n    cancel_url: text(source.cancel_url ?? source.cancelUrl)\n  }\n};\n\nconst errors = [];\nconst emailPattern = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\nif (!emailPattern.test(request.client_email)) errors.push({ field: 'client_email', message: 'A valid client_email is required.' });\nfor (const field of ['client_name', 'meeting_topic', 'meeting_date', 'meeting_time', 'timezone', 'zoom_join_url', 'zoom_meeting_id']) {\n  if (!request[field]) errors.push({ field, message: field + ' is required.' });\n}\nif (!Number.isFinite(request.duration) || request.duration <= 0) errors.push({ field: 'duration', message: 'duration must be a positive number.' });\nif (request.zoom_join_url && !/^https:\\/\\//i.test(request.zoom_join_url)) errors.push({ field: 'zoom_join_url', message: 'zoom_join_url must be an HTTPS URL.' });\n\nreturn [{ json: { valid: errors.length === 0, errors, request } }];"
+        "jsCode": "// Parse incoming appointment booking details and determine the best email template\nconst source = ($json.body && typeof $json.body === 'object' && !Array.isArray($json.body))\n  ? $json.body\n  : (($json.query && typeof $json.query === 'object' && !Array.isArray($json.query))\n    ? $json.query\n    : ($json ?? {}));\n\nconst text = (v) => v == null ? '' : String(v).trim();\nconst customerName = text(source.customer_name || source.client_name || source.patient_name || source.name) || 'Valued Patient';\nconst customerEmail = text(source.customer_email || source.client_email || source.patient_email || source.recipient || source.email).toLowerCase();\nconst customerPhone = text(source.customer_phone || source.client_phone || source.phone);\n\nconst serviceName = text(source.service_name || source.meeting_topic || source.service || source.topic || source.title) || 'Doctor Consultation & General Checkup';\nconst clinicName = text(source.clinic_name || source.business_name || source.company_name || source.host_name) || 'CareSync Medical Clinic';\nconst doctorName = text(source.doctor_name || source.specialist_name || source.practitioner_name || source.host_name);\nconst location = text(source.location || source.address || source.clinic_address) || 'Main Health Plaza, Suite 402, Islamabad';\nconst appointmentId = text(source.appointment_id || source.booking_id || source.id) || ('APT-' + Math.random().toString(36).substring(2, 9).toUpperCase());\nconst timezone = text(source.timezone || source.time_zone) || 'Asia/Karachi';\nconst durationMinutes = Number(source.duration_minutes || source.duration || 30);\nconst notes = text(source.notes || source.agenda || source.instructions || source.description);\nconst senderEmail = text(source.sender_email || source.host_email) || 'sardarumairnawazkhan@gmail.com';\n\n// Parse Date and Time\nlet apptDate = text(source.appointment_date || source.meeting_date || source.date);\nlet apptTime = text(source.appointment_time || source.meeting_time || source.time);\nconst startTimeRaw = text(source.start_time || source.startTime || source.start_datetime);\n\nif ((!apptDate || !apptTime) && startTimeRaw) {\n  try {\n    const d = new Date(startTimeRaw);\n    if (!Number.isNaN(d.getTime())) {\n      const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {\n        timeZone: timezone,\n        year: 'numeric',\n        month: '2-digit',\n        day: '2-digit',\n        hour: '2-digit',\n        minute: '2-digit',\n        hourCycle: 'h23'\n      }).formatToParts(d).filter(p => p.type !== 'literal').map(p => [p.type, p.value]));\n      apptDate = apptDate || `${parts.year}-${parts.month}-${parts.day}`;\n      apptTime = apptTime || `${parts.hour}:${parts.minute}`;\n    }\n  } catch(e) {}\n}\n\nif (!apptDate) {\n  const tomorrow = new Date(Date.now() + 86400000);\n  apptDate = tomorrow.toISOString().split('T')[0];\n}\nif (!apptTime) {\n  apptTime = '11:00';\n}\n\n// Automatic Template Selection\nlet templateType = text(source.template_type || source.template).toLowerCase();\nif (!templateType) {\n  const combined = (serviceName + ' ' + clinicName).toLowerCase();\n  if (combined.includes('wellness') || combined.includes('spa') || combined.includes('massage') || combined.includes('yoga') || combined.includes('therapy')) {\n    templateType = 'wellness_session';\n  } else if (combined.includes('zoom') || combined.includes('meet') || combined.includes('video') || combined.includes('online')) {\n    templateType = 'video_meeting';\n  } else if (combined.includes('doctor') || combined.includes('clinic') || combined.includes('medical') || combined.includes('health') || combined.includes('dental') || combined.includes('consult')) {\n    templateType = 'medical_consultation';\n  } else {\n    templateType = 'general_appointment';\n  }\n}\n\nconst errors = [];\nconst emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\nif (!emailRegex.test(customerEmail)) {\n  errors.push({ field: 'customer_email', message: 'A valid email address is required.' });\n}\n\nreturn [{\n  json: {\n    valid: errors.length === 0,\n    errors,\n    appointment: {\n      customer_name: customerName,\n      customer_email: customerEmail,\n      customer_phone: customerPhone,\n      service_name: serviceName,\n      clinic_name: clinicName,\n      doctor_name: doctorName,\n      location,\n      appointment_id: appointmentId,\n      appointment_date: apptDate,\n      appointment_time: apptTime,\n      start_time: startTimeRaw,\n      timezone,\n      duration_minutes: durationMinutes,\n      notes,\n      sender_email: senderEmail,\n      template_type: templateType,\n      attach_ics: source.attach_ics !== false\n    }\n  }\n}];"
       },
-      "id": "23472a8f-f75c-4225-8cb6-a3f7d4e36788",
-      "name": "Validate Meeting Email Data",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -680,
-        0
-      ]
+        -640,
+        20
+      ],
+      "id": "parse-appointment-data-01",
+      "name": "Select Template & Parse Appointment Data"
     },
     {
       "parameters": {
@@ -55,7 +108,7 @@
           },
           "conditions": [
             {
-              "id": "6c3a163b-f12c-476e-b0dc-dde0ec47b8a0",
+              "id": "val-cond-01",
               "leftValue": "={{ $json.valid }}",
               "rightValue": true,
               "operator": {
@@ -69,53 +122,66 @@
         },
         "options": {}
       },
-      "id": "f465d42b-d874-4b2b-89ce-9ed26ed282e5",
-      "name": "Email Data Valid?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        -460,
-        0
-      ]
+        -420,
+        20
+      ],
+      "id": "if-valid-01",
+      "name": "Email Data Valid?"
     },
     {
       "parameters": {
-        "jsCode": "// Resolve presentation settings and prepare a native n8n binary .ics attachment for Gmail.\nconst data = $('Validate Meeting Email Data').item.json.request;\nconst text = (value) => value == null ? '' : String(value).trim();\nconst env = typeof $env === 'object' && $env ? $env : {};\nconst primaryColorCandidate = text(data.branding.primary_color || env.PRIMARY_COLOR);\nconst primaryColor = /^#[0-9a-f]{6}$/i.test(primaryColorCandidate) ? primaryColorCandidate : '#2563eb';\nconst config = {\n  company_name: text(data.branding.company_name || data.business_name || env.COMPANY_NAME) || data.host_name,\n  company_website: text(data.branding.company_website || env.COMPANY_WEBSITE),\n  support_email: text(data.branding.support_email || env.COMPANY_SUPPORT_EMAIL),\n  logo_url: text(data.branding.logo_url || env.LOGO_URL),\n  primary_color: primaryColor,\n  footer_text: text(data.branding.footer_text || env.COMPANY_FOOTER_TEXT),\n  attach_ics: data.attach_ics == null ? String(env.EMAIL_ATTACH_ICS ?? 'true').toLowerCase() !== 'false' : Boolean(data.attach_ics)\n};\n\nconst pad = value => String(value).padStart(2, '0');\nconst compactUtc = date => date.toISOString().replace(/[-:]/g, '').replace(/\\.\\d{3}Z$/, 'Z');\nconst escapeIcs = value => String(value ?? '').replace(/\\\\/g, '\\\\\\\\').replace(/\\n/g, '\\\\n').replace(/,/g, '\\\\,').replace(/;/g, '\\\\;');\nlet startLine;\nlet endLine;\nconst parsedStart = data.start_time ? new Date(data.start_time) : null;\nif (parsedStart && !Number.isNaN(parsedStart.getTime())) {\n  startLine = 'DTSTART:' + compactUtc(parsedStart);\n  endLine = 'DTEND:' + compactUtc(new Date(parsedStart.getTime() + data.duration * 60000));\n} else {\n  const localStart = new Date(data.meeting_date + 'T' + data.meeting_time + ':00Z');\n  const localEnd = new Date(localStart.getTime() + data.duration * 60000);\n  const compactLocal = date => date.getUTCFullYear() + pad(date.getUTCMonth() + 1) + pad(date.getUTCDate()) + 'T' + pad(date.getUTCHours()) + pad(date.getUTCMinutes()) + pad(date.getUTCSeconds());\n  startLine = 'DTSTART;TZID=' + data.timezone + ':' + compactLocal(localStart);\n  endLine = 'DTEND;TZID=' + data.timezone + ':' + compactLocal(localEnd);\n}\nconst uidDomain = config.company_website ? config.company_website.replace(/^https?:\\/\\//, '').split('/')[0] : 'meeting.local';\nconst organizer = data.host_email ? 'ORGANIZER;CN=' + escapeIcs(data.host_name) + ':mailto:' + escapeIcs(data.host_email) : '';\nconst ics = [\n  'BEGIN:VCALENDAR',\n  'VERSION:2.0',\n  'PRODID:-//' + escapeIcs(config.company_name) + '//Meeting Confirmation//EN',\n  'CALSCALE:GREGORIAN',\n  'METHOD:REQUEST',\n  'BEGIN:VEVENT',\n  'UID:' + escapeIcs(data.appointment_id || data.zoom_meeting_id) + '@' + escapeIcs(uidDomain),\n  'DTSTAMP:' + compactUtc(new Date()),\n  startLine,\n  endLine,\n  organizer,\n  'ATTENDEE;CN=' + escapeIcs(data.client_name) + ';RSVP=TRUE:mailto:' + escapeIcs(data.client_email),\n  'SUMMARY:' + escapeIcs(data.meeting_topic),\n  'DESCRIPTION:' + escapeIcs((data.agenda || data.meeting_topic) + '\\n\\nJoin Zoom: ' + data.zoom_join_url),\n  'LOCATION:' + escapeIcs(data.zoom_join_url),\n  'URL:' + escapeIcs(data.zoom_join_url),\n  'STATUS:CONFIRMED',\n  'END:VEVENT',\n  'END:VCALENDAR'\n].filter(Boolean).join('\\r\\n');\nconst filename = 'meeting-' + data.zoom_meeting_id.replace(/[^a-z0-9_-]/gi, '-') + '.ics';\nconst contentBase64 = Buffer.from(ics, 'utf8').toString('base64');\n\nreturn [{\n  json: {\n    data,\n    config,\n    generated_at: new Date().toISOString(),\n    calendar_attachment: {\n      binary_property: 'calendar_invite',\n      filename,\n      content_type: 'text/calendar; charset=utf-8; method=REQUEST',\n      content_base64: contentBase64\n    }\n  },\n  binary: {\n    calendar_invite: {\n      data: contentBase64,\n      mimeType: 'text/calendar',\n      fileName: filename,\n      fileExtension: 'ics'\n    }\n  }\n}];"
+        "jsCode": "return [{\n  json: {\n    success: false,\n    workflow: 'confirmation_email_agent',\n    status: 'VALIDATION_ERROR',\n    message: 'The confirmation email could not be sent because required fields are missing or invalid.',\n    errors: $json.errors\n  }\n}];"
       },
-      "id": "fc5910ec-fd09-4523-a52e-21dbec5c2fab",
-      "name": "Prepare Email Data",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -240,
-        -100
-      ]
+        -200,
+        200
+      ],
+      "id": "val-error-01",
+      "name": "Return Email Validation Error"
     },
     {
       "parameters": {
-        "jsCode": "// Build one friendly, professional email from the freelancer to the client.\nconst input = $input.item;\nconst prepared = input.json;\nconst { data, config } = prepared;\nconst escapeHtml = value => String(value ?? '').replace(/[&<>\"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' })[char]);\nconst preserveLines = value => escapeHtml(value).replace(/\\r?\\n/g, '<br>');\nconst safeUrl = value => /^https:\\/\\//i.test(String(value ?? '')) ? escapeHtml(value) : '';\nconst displayDate = /^\\d{4}-\\d{2}-\\d{2}$/.test(data.meeting_date)\n  ? new Intl.DateTimeFormat('en-US', { dateStyle: 'full', timeZone: 'UTC' }).format(new Date(data.meeting_date + 'T00:00:00Z'))\n  : data.meeting_date;\nconst discussionText = data.agenda || ('We’ll use our time to discuss ' + data.meeting_topic + ', answer your questions, and agree on the best next steps.');\n\nconst detailRow = (label, value) => value === '' || value == null\n  ? ''\n  : '<tr><td style=\"padding:8px 0;color:#64748b;width:40%;font-size:14px;\">' + escapeHtml(label) + '</td><td style=\"padding:8px 0;color:#0f172a;font-weight:600;font-size:14px;\">' + escapeHtml(value) + '</td></tr>';\nconst brand = () => {\n  const logo = config.logo_url && safeUrl(config.logo_url) ? '<img src=\"' + safeUrl(config.logo_url) + '\" width=\"132\" alt=\"' + escapeHtml(config.company_name) + '\" style=\"display:block;max-width:132px;height:auto;border:0;\">' : '';\n  return '<tr><td style=\"padding:24px 38px;background:#ffffff;border-bottom:1px solid #e2e8f0;\">' + (logo || '<div style=\"font-size:18px;font-weight:800;color:#0f172a;\">' + escapeHtml(config.company_name) + '</div>') + '</td></tr>';\n};\nconst meetingCard = '<div style=\"border:1px solid #dbe4f0;border-radius:12px;padding:20px 22px;margin:24px 0;background:#ffffff;\"><div style=\"font-size:19px;font-weight:800;color:#0f172a;margin-bottom:10px;\">' + escapeHtml(data.meeting_topic) + '</div><table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\">' +\n  detailRow('Date', displayDate) +\n  detailRow('Time', data.meeting_time + ' (' + data.timezone + ')') +\n  detailRow('Duration', data.duration + ' minutes') +\n  detailRow('With', data.host_name) +\n  detailRow('Meeting ID', data.zoom_meeting_id) +\n  detailRow('Password', data.zoom_password) +\n  '</table></div>';\nconst joinSection = '<table role=\"presentation\" cellspacing=\"0\" cellpadding=\"0\" style=\"margin:0 0 18px;\"><tr><td><a href=\"' + safeUrl(data.zoom_join_url) + '\" style=\"display:inline-block;padding:14px 24px;border-radius:9px;text-decoration:none;font-size:15px;font-weight:700;background:' + escapeHtml(config.primary_color) + ';color:#ffffff;\">Join Zoom Meeting</a></td></tr></table><p style=\"margin:0 0 24px;font-size:13px;line-height:1.6;color:#64748b;word-break:break-all;\">If the button does not work, copy this link:<br><a href=\"' + safeUrl(data.zoom_join_url) + '\" style=\"color:' + escapeHtml(config.primary_color) + ';\">' + escapeHtml(data.zoom_join_url) + '</a></p>';\nconst discussion = '<div style=\"padding:19px 20px;background:#f8fafc;border-radius:11px;border-left:4px solid ' + escapeHtml(config.primary_color) + ';margin:0 0 24px;\"><div style=\"font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#64748b;margin-bottom:8px;\">What we’ll discuss</div><div style=\"font-size:15px;line-height:1.7;color:#334155;\">' + preserveLines(discussionText) + '</div></div>';\nconst footer = () => {\n  const support = config.support_email ? ' Need help? <a href=\"mailto:' + escapeHtml(config.support_email) + '\" style=\"color:#cbd5e1;\">' + escapeHtml(config.support_email) + '</a>.' : '';\n  const website = config.company_website && safeUrl(config.company_website) ? '<a href=\"' + safeUrl(config.company_website) + '\" style=\"color:#cbd5e1;\">' + escapeHtml(config.company_name) + '</a>' : escapeHtml(config.company_name);\n  return (config.footer_text ? escapeHtml(config.footer_text) + '<br>' : '') + website + '.' + support;\n};\nconst content = '<div style=\"font-size:12px;font-weight:800;letter-spacing:.11em;text-transform:uppercase;color:' + escapeHtml(config.primary_color) + ';margin-bottom:15px;\">Meeting confirmed</div><h1 style=\"margin:0 0 14px;font-size:29px;line-height:1.25;\">I’m looking forward to speaking with you</h1><p style=\"margin:0 0 12px;font-size:16px;line-height:1.7;color:#475569;\">Hi ' + escapeHtml(data.client_name) + ',</p><p style=\"margin:0 0 20px;font-size:16px;line-height:1.7;color:#475569;\">Thanks for scheduling time with me. Your meeting is confirmed, and I’m looking forward to a useful conversation about <strong>' + escapeHtml(data.meeting_topic) + '</strong>.</p>' + discussion + meetingCard + joinSection + '<div style=\"padding:17px 19px;background:#eff6ff;border-radius:10px;color:#1e3a8a;font-size:14px;line-height:1.65;\"><strong>A quick reminder</strong><br>Please keep this email handy and join a few minutes early. The calendar invitation is attached for convenience.</div><p style=\"margin:26px 0 0;font-size:15px;line-height:1.7;color:#475569;\">See you soon,<br><strong style=\"color:#0f172a;\">' + escapeHtml(data.host_name) + '</strong></p>';\nconst html = '<!doctype html><html><head><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><style>@media only screen and (max-width:620px){.shell{width:100%!important}.body{padding:28px 20px!important}.join a{display:block!important;text-align:center!important}}</style></head><body style=\"margin:0;padding:0;background:#eef2f7;font-family:Inter,Arial,Helvetica,sans-serif;color:#0f172a;\"><table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"background:#eef2f7;padding:30px 12px;\"><tr><td align=\"center\"><table role=\"presentation\" class=\"shell\" width=\"620\" cellspacing=\"0\" cellpadding=\"0\" style=\"width:100%;max-width:620px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 12px 36px rgba(15,23,42,.10);\"><tr><td style=\"height:7px;background:' + escapeHtml(config.primary_color) + ';\"></td></tr>' + brand() + '<tr><td class=\"body\" style=\"padding:38px 42px;\">' + content + '</td></tr><tr><td style=\"padding:23px 38px;background:#0f172a;color:#94a3b8;font-size:12px;line-height:1.7;text-align:center;\">' + footer() + '</td></tr></table></td></tr></table></body></html>';\n\nreturn [{\n  json: {\n    ...prepared,\n    client_template: {\n      subject: 'Your Meeting is Confirmed 🎉',\n      html\n    },\n    template_version: '4.0.0-gmail-freelancer',\n    email_provider: 'gmail'\n  },\n  binary: input.binary\n}];"
+        "jsCode": "// Generate RFC-5545 compliant .ics calendar invitation and create n8n binary attachment\nconst appt = $('Select Template & Parse Appointment Data').first().json.appointment;\n\nconst pad = (v) => String(v).padStart(2, '0');\nconst compactUtc = (d) => d.toISOString().replace(/[-:]/g, '').replace(/\\.\\d{3}Z$/, 'Z');\nconst escapeIcs = (v) => String(v ?? '').replace(/\\\\/g, '\\\\\\\\').replace(/\\n/g, '\\\\n').replace(/,/g, '\\\\,').replace(/;/g, '\\\\;');\n\nlet dtStart, dtEnd;\nconst startTimeParsed = appt.start_time ? new Date(appt.start_time) : null;\nif (startTimeParsed && !Number.isNaN(startTimeParsed.getTime())) {\n  dtStart = 'DTSTART:' + compactUtc(startTimeParsed);\n  dtEnd = 'DTEND:' + compactUtc(new Date(startTimeParsed.getTime() + appt.duration_minutes * 60000));\n} else {\n  const localStart = new Date(appt.appointment_date + 'T' + appt.appointment_time + ':00Z');\n  const localEnd = new Date(localStart.getTime() + appt.duration_minutes * 60000);\n  const compactLocal = (d) => d.getUTCFullYear() + pad(d.getUTCMonth() + 1) + pad(d.getUTCDate()) + 'T' + pad(d.getUTCHours()) + pad(d.getUTCMinutes()) + pad(d.getUTCSeconds());\n  dtStart = 'DTSTART;TZID=' + appt.timezone + ':' + compactLocal(localStart);\n  dtEnd = 'DTEND;TZID=' + appt.timezone + ':' + compactLocal(localEnd);\n}\n\nconst icsContent = [\n  'BEGIN:VCALENDAR',\n  'VERSION:2.0',\n  'PRODID:-//' + escapeIcs(appt.clinic_name) + '//Appointment Assistant//EN',\n  'CALSCALE:GREGORIAN',\n  'METHOD:REQUEST',\n  'BEGIN:VEVENT',\n  'UID:' + escapeIcs(appt.appointment_id) + '@caresync.health',\n  'DTSTAMP:' + compactUtc(new Date()),\n  dtStart,\n  dtEnd,\n  appt.sender_email ? 'ORGANIZER;CN=' + escapeIcs(appt.clinic_name) + ':mailto:' + escapeIcs(appt.sender_email) : '',\n  'ATTENDEE;CN=' + escapeIcs(appt.customer_name) + ';RSVP=TRUE:mailto:' + escapeIcs(appt.customer_email),\n  'SUMMARY:' + escapeIcs(appt.service_name + ' \u2014 ' + appt.clinic_name),\n  'DESCRIPTION:' + escapeIcs('Appointment Reference: ' + appt.appointment_id + '\\\\nPatient: ' + appt.customer_name + '\\\\nService: ' + appt.service_name + '\\\\nLocation: ' + appt.location + (appt.notes ? '\\\\nNotes: ' + appt.notes : '')),\n  'LOCATION:' + escapeIcs(appt.location),\n  'STATUS:CONFIRMED',\n  'END:VEVENT',\n  'END:VCALENDAR'\n].filter(Boolean).join('\\r\\n');\n\nconst icsBase64 = Buffer.from(icsContent, 'utf8').toString('base64');\nconst icsFilename = 'appointment-' + appt.appointment_id.replace(/[^a-z0-9_-]/gi, '-') + '.ics';\n\nreturn [{\n  json: {\n    appointment: appt,\n    calendar_attachment: {\n      binary_property: 'calendar_invite',\n      filename: icsFilename,\n      content_type: 'text/calendar; charset=utf-8; method=REQUEST',\n      content_base64: icsBase64\n    }\n  },\n  binary: {\n    calendar_invite: {\n      data: icsBase64,\n      mimeType: 'text/calendar',\n      fileName: icsFilename,\n      fileExtension: 'ics'\n    }\n  }\n}];"
       },
-      "id": "69692b7d-a019-4458-8b84-e95152b2997c",
-      "name": "Build Friendly Client Email",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        0,
-        -100
-      ]
+        -200,
+        -80
+      ],
+      "id": "gen-ics-01",
+      "name": "Generate Calendar Invite (.ics)"
     },
     {
       "parameters": {
-        "jsCode": "// Expose the message fields consumed by the native n8n Gmail node.\nconst input = $input.item;\nconst prepared = input.json;\nreturn [{\n  json: {\n    ...prepared,\n    client_email_message: {\n      sender_name: prepared.data.host_name,\n      recipient: prepared.data.client_email,\n      subject: prepared.client_template.subject,\n      html: prepared.client_template.html,\n      attachment_binary_property: prepared.config.attach_ics ? prepared.calendar_attachment.binary_property : '',\n      prepared_at: prepared.generated_at\n    }\n  },\n  binary: input.binary\n}];"
+        "jsCode": "// Render a responsive HTML email message based on the chosen template type\nconst appt = $json.appointment;\nconst escapeHtml = (v) => String(v ?? '').replace(/[&<>\"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' })[c]);\n\n// Format Date & Time nicely\nlet displayDate = appt.appointment_date;\ntry {\n  displayDate = new Intl.DateTimeFormat('en-US', {\n    dateStyle: 'full',\n    timeZone: 'UTC'\n  }).format(new Date(appt.appointment_date + 'T00:00:00Z'));\n} catch(e) {}\n\nlet displayTime = appt.appointment_time;\ntry {\n  const parts = appt.appointment_time.split(':');\n  if (parts.length >= 2) {\n    const h = parseInt(parts[0], 10);\n    const m = parts[1].slice(0, 2);\n    displayTime = `${h % 12 || 12}:${m} ${h >= 12 ? 'PM' : 'AM'}`;\n  }\n} catch(e) {}\n\n// Google Calendar 1-Click Link\nconst gCalStart = appt.appointment_date.replace(/-/g, '') + 'T' + appt.appointment_time.replace(/:/g, '').slice(0, 4) + '00';\nconst gCalEnd = appt.appointment_date.replace(/-/g, '') + 'T' + (parseInt(appt.appointment_time.replace(/:/g, '').slice(0, 4), 10) + 30) + '00';\nconst gCalTitle = encodeURIComponent(`${appt.service_name} \u2014 ${appt.clinic_name}`);\nconst gCalDetails = encodeURIComponent(`Appointment Ref: ${appt.appointment_id}\\nPatient: ${appt.customer_name}\\nService: ${appt.service_name}\\nLocation: ${appt.location}`);\nconst gCalLoc = encodeURIComponent(appt.location);\nconst gCalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${gCalTitle}&dates=${gCalStart}/${gCalEnd}&details=${gCalDetails}&location=${gCalLoc}`;\n\n// Template Theme Settings\nconst templateConfigs = {\n  medical_consultation: {\n    primaryColor: '#0284c7',\n    badgeText: 'Medical Consultation Confirmed',\n    headerIcon: '\ud83c\udfe5',\n    heroTitle: 'Your Consultation is Confirmed',\n    instructionTitle: 'Medical & Consultation Guidelines',\n    instructions: 'Please arrive 10 minutes prior to your scheduled consultation time. Bring your national ID, insurance card, and any recent lab or medical test reports.',\n    accentBg: '#eff6ff',\n    accentBorder: '#3b82f6',\n    cardBg: '#f8fafc'\n  },\n  wellness_session: {\n    primaryColor: '#10b981',\n    badgeText: 'Wellness Session Reserved',\n    headerIcon: '\ud83c\udf3f',\n    heroTitle: 'Your Wellness Session is Reserved',\n    instructionTitle: 'Session Preparation',\n    instructions: 'Please wear comfortable attire and arrive 10 minutes early to check in and relax in our quiet lounge before your session.',\n    accentBg: '#ecfdf5',\n    accentBorder: '#10b981',\n    cardBg: '#f0fdf4'\n  },\n  video_meeting: {\n    primaryColor: '#4f46e5',\n    badgeText: 'Video Meeting Scheduled',\n    headerIcon: '\ud83d\udcbb',\n    heroTitle: 'Your Video Meeting is Scheduled',\n    instructionTitle: 'Video Call Instructions',\n    instructions: 'Please test your audio and camera beforehand and join using the link 5 minutes prior to the start time.',\n    accentBg: '#eef2ff',\n    accentBorder: '#4f46e5',\n    cardBg: '#f8fafc'\n  },\n  general_appointment: {\n    primaryColor: '#0f172a',\n    badgeText: 'Appointment Confirmed',\n    headerIcon: '\ud83d\uddd3\ufe0f',\n    heroTitle: 'Your Appointment is Confirmed',\n    instructionTitle: 'Important Reminders',\n    instructions: 'Please keep this confirmation handy. A calendar invite is attached for your Google, Apple, or Outlook calendar.',\n    accentBg: '#f1f5f9',\n    accentBorder: '#0f172a',\n    cardBg: '#ffffff'\n  }\n};\n\nconst config = templateConfigs[appt.template_type] || templateConfigs.general_appointment;\n\nconst detailRow = (icon, label, value) => !value ? '' : `\n  <tr>\n    <td style=\"padding:9px 0;color:#64748b;font-size:14px;width:38%;vertical-align:top;\">\n      <span style=\"display:inline-block;width:20px;\">${icon}</span> ${escapeHtml(label)}:\n    </td>\n    <td style=\"padding:9px 0;color:#0f172a;font-weight:600;font-size:14px;vertical-align:top;\">\n      ${escapeHtml(value)}\n    </td>\n  </tr>\n`;\n\nconst html = `<!doctype html>\n<html>\n<head>\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n  <style>\n    @media only screen and (max-width: 620px) {\n      .container-table { width: 100% !important; }\n      .body-content { padding: 26px 18px !important; }\n      .cal-btn { display: block !important; text-align: center !important; }\n    }\n  </style>\n</head>\n<body style=\"margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0f172a;\">\n  <table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"background:#f1f5f9;padding:32px 12px;\">\n    <tr>\n      <td align=\"center\">\n        <table role=\"presentation\" class=\"container-table\" width=\"620\" cellspacing=\"0\" cellpadding=\"0\" style=\"width:100%;max-width:620px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 12px 35px rgba(15,23,42,0.08);border:1px solid #e2e8f0;\">\n          <!-- Top Accent Bar -->\n          <tr><td style=\"height:6px;background:${config.primaryColor};\"></td></tr>\n\n          <!-- Clinic / Company Header -->\n          <tr>\n            <td style=\"padding:24px 36px;border-bottom:1px solid #e2e8f0;background:#ffffff;\">\n              <table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\">\n                <tr>\n                  <td>\n                    <div style=\"font-size:20px;font-weight:800;color:${config.primaryColor};letter-spacing:-0.02em;\">\n                      ${config.headerIcon} ${escapeHtml(appt.clinic_name)}\n                    </div>\n                  </td>\n                  <td align=\"right\">\n                    <span style=\"font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;background:${config.accentBg};color:${config.primaryColor};padding:4px 10px;border-radius:12px;border:1px solid ${config.primaryColor};\">\n                      \u2713 Verified Booking\n                    </span>\n                  </td>\n                </tr>\n              </table>\n            </td>\n          </tr>\n\n          <!-- Main Body -->\n          <tr>\n            <td class=\"body-content\" style=\"padding:36px 36px 28px;\">\n              <div style=\"font-size:12px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:${config.primaryColor};margin-bottom:12px;\">\n                ${config.badgeText}\n              </div>\n              <h1 style=\"margin:0 0 16px;font-size:27px;color:#0f172a;line-height:1.25;letter-spacing:-0.02em;\">\n                ${config.heroTitle}\n              </h1>\n              <p style=\"margin:0 0 16px;font-size:15px;line-height:1.7;color:#475569;\">\n                Hi <strong>${escapeHtml(appt.customer_name)}</strong>,\n              </p>\n              <p style=\"margin:0 0 24px;font-size:15px;line-height:1.7;color:#475569;\">\n                Your appointment at <strong>${escapeHtml(appt.clinic_name)}</strong> has been scheduled and confirmed. Below is your official consultation summary:\n              </p>\n\n              <!-- Highlighted Appointment Card -->\n              <div style=\"background:${config.cardBg};border:1.5px solid #e2e8f0;border-radius:14px;padding:22px 24px;margin:22px 0;\">\n                <div style=\"font-size:16px;font-weight:800;color:#0f172a;margin-bottom:14px;border-bottom:1px solid #e2e8f0;padding-bottom:10px;display:flex;justify-content:space-between;\">\n                  <span>\ud83d\udccb Reference: <strong style=\"color:${config.primaryColor};\">#${escapeHtml(appt.appointment_id)}</strong></span>\n                </div>\n                <table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\">\n                  ${detailRow('\ud83e\ude7a', 'Service', appt.service_name)}\n                  ${appt.doctor_name ? detailRow('\ud83d\udc68\u200d\u2695\ufe0f', 'Specialist', appt.doctor_name) : ''}\n                  ${detailRow('\ud83d\udcc5', 'Date', displayDate)}\n                  ${detailRow('\u23f0', 'Time', `${displayTime} (${appt.timezone})`)}\n                  ${detailRow('\u23f1\ufe0f', 'Duration', `${appt.duration_minutes} Minutes`)}\n                  ${detailRow('\ud83d\udc64', 'Patient', appt.customer_name)}\n                  ${detailRow('\ud83d\udccd', 'Location', appt.location)}\n                  ${appt.customer_phone ? detailRow('\ud83d\udcde', 'Contact Phone', appt.customer_phone) : ''}\n                </table>\n              </div>\n\n              <!-- 1-Click Calendar Add Button -->\n              <table role=\"presentation\" cellspacing=\"0\" cellpadding=\"0\" style=\"margin:20px 0 24px;\">\n                <tr>\n                  <td>\n                    <a href=\"${gCalUrl}\" target=\"_blank\" class=\"cal-btn\" style=\"display:inline-block;padding:12px 22px;border-radius:10px;background:${config.primaryColor};color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;box-shadow:0 4px 12px rgba(2,132,199,0.28);\">\n                      \ud83d\udcc5 Add to Google Calendar\n                    </a>\n                  </td>\n                </tr>\n              </table>\n\n              <!-- Calendar Invite Notice -->\n              <div style=\"padding:16px 20px;background:${config.accentBg};border-radius:10px;border-left:4px solid ${config.accentBorder};color:#1e3a8a;font-size:13.5px;line-height:1.6;margin:20px 0;\">\n                <strong>\ud83d\udcc5 Calendar Invite Attached (.ics):</strong><br>\n                A standard calendar invitation (<code>appointment-${escapeHtml(appt.appointment_id)}.ics</code>) is attached to this email. Opening it will automatically add this appointment to your Google Calendar, Apple Calendar, or Outlook schedule.\n              </div>\n\n              <!-- Preparation & Guidance Box -->\n              <div style=\"padding:16px 20px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;font-size:13.5px;line-height:1.6;color:#334155;margin:20px 0;\">\n                <strong>\ud83d\udca1 ${config.instructionTitle}:</strong><br>\n                ${escapeHtml(appt.notes || config.instructions)}\n              </div>\n\n              <p style=\"margin:24px 0 0;font-size:15px;line-height:1.7;color:#475569;\">\n                Looking forward to your visit,<br>\n                <strong>${escapeHtml(appt.clinic_name)} Team</strong>\n              </p>\n            </td>\n          </tr>\n\n          <!-- Footer -->\n          <tr>\n            <td style=\"padding:22px 36px;background:#0f172a;color:#94a3b8;font-size:12px;line-height:1.7;text-align:center;\">\n              ${escapeHtml(appt.clinic_name)} \u2022 ${escapeHtml(appt.location)}<br>\n              Need to reschedule or have questions? Contact us at <a href=\"mailto:${escapeHtml(appt.sender_email)}\" style=\"color:#38bdf8;\">${escapeHtml(appt.sender_email)}</a>.\n            </td>\n          </tr>\n        </table>\n      </td>\n    </tr>\n  </table>\n</body>\n</html>`;\n\nconst subject = `Your Appointment is Confirmed \ud83c\udf89 | ${displayDate} at ${displayTime} \u2014 ${appt.clinic_name}`;\n\nreturn [{\n  json: {\n    appointment: appt,\n    template_used: appt.template_type,\n    recipient: appt.customer_email,\n    subject,\n    html,\n    sender_name: appt.clinic_name,\n    attach_ics: appt.attach_ics\n  },\n  binary: $input.item.binary\n}];"
       },
-      "id": "f92ac60b-19b5-4809-85aa-4fb224305bd6",
-      "name": "Prepare Client Gmail Message",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        480,
-        -100
-      ]
+        40,
+        -80
+      ],
+      "id": "build-html-01",
+      "name": "Build Selected HTML Template"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.item;\nconst prep = input.json;\nreturn [{\n  json: {\n    ...prep,\n    client_email_message: {\n      sender_name: prep.sender_name,\n      recipient: prep.recipient,\n      subject: prep.subject,\n      html: prep.html,\n      attachment_binary_property: prep.attach_ics ? 'calendar_invite' : ''\n    }\n  },\n  binary: input.binary\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        280,
+        -80
+      ],
+      "id": "prep-gmail-01",
+      "name": "Prepare Client Gmail Message"
     },
     {
       "parameters": {
@@ -126,15 +192,13 @@
         "subject": "={{ $json.client_email_message.subject }}",
         "emailType": "html",
         "message": "={{ $json.client_email_message.html }}",
-        "options": "={{ { appendAttribution: false, senderName: $json.client_email_message.sender_name, ...($json.config.attach_ics ? { attachmentsUi: { attachmentsBinary: [{ property: $json.client_email_message.attachment_binary_property }] } } : {}) } }}"
+        "options": "={{ { appendAttribution: false, senderName: $json.client_email_message.sender_name, ...($json.attach_ics ? { attachmentsUi: { attachmentsBinary: [{ property: $json.client_email_message.attachment_binary_property }] } } : {}) } }}"
       },
-      "id": "ca96cc18-dfa2-426f-bd5f-24e2f1fe10f1",
-      "name": "Send Client Confirmation via Gmail",
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.2,
       "position": [
-        720,
-        -100
+        520,
+        -80
       ],
       "credentials": {
         "gmailOAuth2": {
@@ -142,48 +206,64 @@
           "name": "Gmail account"
         }
       },
+      "id": "send-gmail-node-01",
+      "name": "Send Client Confirmation via Gmail",
       "onError": "continueRegularOutput"
     },
     {
       "parameters": {
-        "jsCode": "// Normalize the native Gmail response without failing the completed meeting.\nconst response = $json ?? {};\nconst prepared = $('Prepare Client Gmail Message').item.json;\nconst completedAt = new Date();\nconst startedAt = new Date(prepared.client_email_message.prepared_at);\nconst gmailError = response.error?.message ?? response.error ?? '';\nconst sent = !gmailError && Boolean(response.id || response.threadId);\nconst client = {\n  sent,\n  provider: 'gmail',\n  sender: 'authenticated freelancer Gmail account',\n  sender_name: prepared.client_email_message.sender_name,\n  recipient: prepared.client_email_message.recipient,\n  status_code: sent ? 200 : 500,\n  provider_message_id: String(response.id ?? ''),\n  thread_id: String(response.threadId ?? ''),\n  error: sent ? null : String(gmailError || 'Gmail did not return a message ID. Check the Gmail credential and execution details.'),\n  provider_response: response,\n  prepared_at: prepared.client_email_message.prepared_at,\n  completed_at: completedAt.toISOString(),\n  elapsed_ms_since_preparation: Number.isNaN(startedAt.getTime()) ? null : completedAt.getTime() - startedAt.getTime(),\n  execution_id: typeof $execution !== 'undefined' ? $execution.id : null,\n  calendar_attachment_sent: sent && prepared.config.attach_ics\n};\nif (!sent) console.error('Gmail meeting confirmation failed', { recipient_type: 'client', ...client, timestamp: completedAt.toISOString() });\nconst failures = sent ? [] : [{\n  recipient: 'client',\n  email: client.recipient,\n  error: client.error,\n  status_code: client.status_code,\n  timestamp: client.completed_at,\n  provider_response: client.provider_response\n}];\n\nreturn [{ json: {\n  success: true,\n  meeting_created: prepared.data.meeting_created,\n  calendar_event_created: prepared.data.calendar_event_created,\n  host_email_sent: false,\n  host_email_skipped: true,\n  client_email_sent: sent,\n  email_sender: 'authenticated freelancer Gmail account',\n  email_recipient: prepared.data.client_email,\n  zoom_join_url: prepared.data.zoom_join_url,\n  meeting_id: prepared.data.zoom_meeting_id,\n  message: sent\n    ? 'Meeting created successfully and the client confirmation was sent from the freelancer Gmail account.'\n    : 'Meeting created successfully, but the client Gmail confirmation failed.',\n  email_failures: failures,\n  email_results: { client },\n  email_template_version: prepared.template_version,\n  calendar_attachment_prepared: Boolean(prepared.calendar_attachment?.content_base64),\n  calendar_attachment_sent: client.calendar_attachment_sent,\n  completed_at: completedAt.toISOString()\n} }];"
+        "jsCode": "const response = $json ?? {};\nconst prep = $('Prepare Client Gmail Message').first().json;\nconst gmailError = response.error?.message ?? response.error ?? '';\nconst sent = !gmailError && Boolean(response.id || response.threadId);\n\nreturn [{\n  json: {\n    success: sent,\n    workflow: 'confirmation_email_agent',\n    status: sent ? 'DELIVERED' : 'FAILED',\n    recipient: prep.recipient,\n    subject: prep.subject,\n    template_used: prep.template_used,\n    appointment_id: prep.appointment.appointment_id,\n    appointment_date: prep.appointment.appointment_date,\n    appointment_time: prep.appointment.appointment_time,\n    service_name: prep.appointment.service_name,\n    clinic_name: prep.appointment.clinic_name,\n    calendar_invite_attached: prep.attach_ics,\n    gmail_message_id: response.id || null,\n    error: sent ? null : (gmailError || 'Gmail sending failed'),\n    message: sent\n      ? 'Confirmation email with calendar invite delivered successfully via Gmail.'\n      : 'Failed to deliver confirmation email via Gmail: ' + gmailError\n  }\n}];"
       },
-      "id": "6ae7589d-b87c-458b-a9ad-1b262c5fbd00",
-      "name": "Return Client Email Result",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        960,
-        -100
-      ]
+        760,
+        -80
+      ],
+      "id": "format-response-01",
+      "name": "Format Agent Response"
     },
     {
       "parameters": {
-        "jsCode": "return [{ json: {\n  success: false,\n  meeting_created: $json.request?.meeting_created ?? true,\n  calendar_event_created: $json.request?.calendar_event_created ?? true,\n  host_email_sent: false,\n  host_email_skipped: true,\n  client_email_sent: false,\n  email_sender: 'authenticated freelancer Gmail account',\n  email_recipient: $json.request?.client_email ?? null,\n  zoom_join_url: $json.request?.zoom_join_url ?? null,\n  meeting_id: $json.request?.zoom_meeting_id ?? null,\n  message: 'The client confirmation was not sent because the email payload is invalid.',\n  validation_errors: $json.errors\n} }];"
+        "respondWith": "allIncomingItems",
+        "options": {
+          "responseCode": 200
+        }
       },
-      "id": "30a4fbac-2690-4623-8076-aed173812fbc",
-      "name": "Return Email Validation Error",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
       "position": [
-        -240,
-        140
-      ]
+        1000,
+        20
+      ],
+      "id": "respond-webhook-01",
+      "name": "Respond to Webhook"
     }
   ],
   "connections": {
-    "When Executed by Another Workflow": {
+    "Webhook": {
       "main": [
         [
           {
-            "node": "Validate Meeting Email Data",
+            "node": "Select Template & Parse Appointment Data",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Validate Meeting Email Data": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Select Template & Parse Appointment Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select Template & Parse Appointment Data": {
       "main": [
         [
           {
@@ -198,7 +278,7 @@
       "main": [
         [
           {
-            "node": "Prepare Email Data",
+            "node": "Generate Calendar Invite (.ics)",
             "type": "main",
             "index": 0
           }
@@ -212,18 +292,29 @@
         ]
       ]
     },
-    "Prepare Email Data": {
+    "Return Email Validation Error": {
       "main": [
         [
           {
-            "node": "Build Friendly Client Email",
+            "node": "Respond to Webhook",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Build Friendly Client Email": {
+    "Generate Calendar Invite (.ics)": {
+      "main": [
+        [
+          {
+            "node": "Build Selected HTML Template",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Selected HTML Template": {
       "main": [
         [
           {
@@ -249,7 +340,18 @@
       "main": [
         [
           {
-            "node": "Return Client Email Result",
+            "node": "Format Agent Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Agent Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
             "type": "main",
             "index": 0
           }
@@ -259,16 +361,5 @@
   },
   "settings": {
     "executionOrder": "v1"
-  },
-  "active": false,
-  "versionId": "86cb77bb-3be0-4200-8bd4-c4fca061c4df",
-  "meta": {
-    "templateCredsSetupCompleted": false
-  },
-  "tags": [
-    {
-      "id": "3ab0e80d-f695-44bf-82fd-314287d31030",
-      "name": "email"
-    }
-  ]
+  }
 }
