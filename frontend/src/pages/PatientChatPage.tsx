@@ -1,4 +1,5 @@
 import {
+  AlertCircle,
   Building2,
   Calendar,
   CalendarCheck2,
@@ -7,14 +8,19 @@ import {
   Download,
   ExternalLink,
   Home,
+  Mail,
   MapPin,
   Moon,
+  Phone,
   RefreshCw,
   RotateCcw,
   Send,
   Sparkles,
   Sun,
   User,
+  UserCheck,
+  UserPlus,
+  X,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -81,6 +87,53 @@ export function PatientChatPage() {
 
   const [businesses, setBusinesses] = useState<PublicBusiness[]>([]);
   const [clinic, setClinic] = useState<ClinicInfo | null>(null);
+
+  // Customer state & database linkage
+  const [customerId, setCustomerId] = useState<string>(
+    () => searchParams.get('customer_id') || sessionStorage.getItem('ai_assistant_customer_id') || ''
+  );
+  const [customerName, setCustomerName] = useState<string>(
+    () => searchParams.get('name') || sessionStorage.getItem('ai_assistant_customer_name') || ''
+  );
+  const [customerPhone, setCustomerPhone] = useState<string>(
+    () => searchParams.get('phone') || sessionStorage.getItem('ai_assistant_customer_phone') || ''
+  );
+  const [customerEmail, setCustomerEmail] = useState<string>(
+    () => searchParams.get('email') || sessionStorage.getItem('ai_assistant_customer_email') || ''
+  );
+
+  // In-chat customer registration modal state
+  const [showRegModal, setShowRegModal] = useState(false);
+  const [modalName, setModalName] = useState(customerName);
+  const [modalPhone, setModalPhone] = useState(customerPhone);
+  const [modalEmail, setModalEmail] = useState(customerEmail);
+  const [modalLoading, setModalLoading] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
+
+  // Sync with searchParams if navigated with parameters
+  useEffect(() => {
+    const cid = searchParams.get('customer_id');
+    const cname = searchParams.get('name');
+    const cphone = searchParams.get('phone');
+    const cemail = searchParams.get('email');
+    if (cid) {
+      setCustomerId(cid);
+      sessionStorage.setItem('ai_assistant_customer_id', cid);
+    }
+    if (cname) {
+      setCustomerName(cname);
+      sessionStorage.setItem('ai_assistant_customer_name', cname);
+    }
+    if (cphone) {
+      setCustomerPhone(cphone);
+      sessionStorage.setItem('ai_assistant_customer_phone', cphone);
+    }
+    if (cemail) {
+      setCustomerEmail(cemail);
+      sessionStorage.setItem('ai_assistant_customer_email', cemail);
+    }
+  }, [searchParams]);
+
   const [conversationId, setConversationId] = useState<string>(() => {
     const saved = sessionStorage.getItem(CONV_STORAGE_KEY);
     if (saved) return saved;
@@ -173,8 +226,8 @@ export function PatientChatPage() {
     if (isConfirmed && (data?.appointment_id || lower.includes('appointment'))) {
       return {
         appointment_id: data?.appointment_id || crypto.randomUUID(),
-        customer_name: data?.customer_name || 'Patient',
-        customer_phone: data?.customer_phone || '',
+        customer_name: customerName || data?.customer_name || 'Patient',
+        customer_phone: customerPhone || data?.customer_phone || '',
         service_name: data?.service_name || 'Doctor Consultation',
         start_datetime: data?.start_datetime || new Date().toISOString(),
         address: clinic?.business?.address || 'Clinic Main Reception',
@@ -263,12 +316,21 @@ export function PatientChatPage() {
         body: JSON.stringify({
           business_id: clinic?.business?.id || businessIdParam || undefined,
           conversation_id: conversationId,
+          customer_id: customerId || undefined,
+          customer_name: customerName || undefined,
+          customer_phone: customerPhone || undefined,
+          customer_email: customerEmail || undefined,
           message: text,
         }),
       });
 
       const resData = await res.json();
       clearTimeout(statusTimer);
+
+      if (resData.data?.customer_id && !customerId) {
+        setCustomerId(resData.data.customer_id);
+        sessionStorage.setItem('ai_assistant_customer_id', resData.data.customer_id);
+      }
 
       const replyText = resData.reply || 'Your request has been received.';
       const slots = resData.data?.slots || extractSlotsFromText(replyText);
@@ -299,6 +361,64 @@ export function PatientChatPage() {
     } finally {
       setIsThinking(false);
       setTimeout(() => inputRef.current?.focus(), 50);
+    }
+  };
+
+  const handleRegisterFromChat = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const activeBizId = clinic?.business?.id || businessIdParam || (businesses[0]?.id ?? '');
+    if (!activeBizId) return;
+    if (!modalName.trim() || !modalPhone.trim()) {
+      setModalError('Please enter both your name and phone number.');
+      return;
+    }
+
+    setModalLoading(true);
+    setModalError(null);
+    try {
+      const res = await fetch('/api/public/customers/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          business_id: activeBizId,
+          name: modalName.trim(),
+          phone: modalPhone.trim(),
+          email: modalEmail.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || data.message || 'Failed to save customer');
+      }
+
+      const newCid = data.customer?.id;
+      setCustomerId(newCid || '');
+      setCustomerName(modalName.trim());
+      setCustomerPhone(modalPhone.trim());
+      setCustomerEmail(modalEmail.trim());
+
+      if (newCid) sessionStorage.setItem('ai_assistant_customer_id', newCid);
+      sessionStorage.setItem('ai_assistant_customer_name', modalName.trim());
+      sessionStorage.setItem('ai_assistant_customer_phone', modalPhone.trim());
+      if (modalEmail.trim()) {
+        sessionStorage.setItem('ai_assistant_customer_email', modalEmail.trim());
+      }
+
+      setShowRegModal(false);
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          sender: 'assistant',
+          text: `Thank you, ${modalName.trim()}! Your customer details have been saved in our database. How may I assist you with your booking or inquiries?`,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        },
+      ]);
+    } catch (err: any) {
+      setModalError(err.message || 'Error saving customer information');
+    } finally {
+      setModalLoading(false);
     }
   };
 
@@ -386,6 +506,46 @@ export function PatientChatPage() {
               ))}
             </select>
           </div>
+        )}
+
+        {/* Customer Badge / Registration in Header */}
+        {customerName ? (
+          <div className="ai-stage-cust-chip" title={`Registered customer in database. ID: ${customerId}`}>
+            <UserCheck size={13} className="ai-stage-cust-chip-icon" />
+            <div className="ai-stage-cust-chip-info">
+              <span className="ai-stage-cust-chip-name">{customerName}</span>
+              {customerPhone && <span className="ai-stage-cust-chip-phone">({customerPhone})</span>}
+            </div>
+            <span className="ai-stage-cust-chip-tag">DB Linked</span>
+            <button
+              type="button"
+              className="ai-stage-cust-chip-edit"
+              onClick={() => {
+                setModalName(customerName);
+                setModalPhone(customerPhone);
+                setModalEmail(customerEmail);
+                setShowRegModal(true);
+              }}
+              title="Edit customer information"
+            >
+              Edit
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            className="ai-stage-cust-reg-btn"
+            onClick={() => {
+              setModalName('');
+              setModalPhone('');
+              setModalEmail('');
+              setShowRegModal(true);
+            }}
+            title="Register your details with this clinic in the database"
+          >
+            <UserPlus size={13} />
+            <span>Register as Customer</span>
+          </button>
         )}
 
         <div className="ai-stage-header-actions">
@@ -629,6 +789,109 @@ export function PatientChatPage() {
           </button>
         </div>
       </footer>
+
+      {/* In-Chat Customer Registration Modal */}
+      {showRegModal && (
+        <div className="ai-modal-overlay" onClick={() => setShowRegModal(false)}>
+          <div className="ai-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="ai-modal-header">
+              <div className="ai-modal-title">
+                <UserCheck size={18} />
+                <span>Register with {clinic?.business?.name || 'Clinic'}</span>
+              </div>
+              <button
+                type="button"
+                className="ai-modal-close"
+                onClick={() => setShowRegModal(false)}
+                aria-label="Close"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <p className="ai-modal-subtitle">
+              Store your customer relationship in the database. Your upcoming appointments and booking history will be linked to your profile.
+            </p>
+
+            <form onSubmit={handleRegisterFromChat} className="ai-modal-form">
+              <div className="ai-modal-field">
+                <label htmlFor="chat-cust-name">Full Name *</label>
+                <div className="ai-modal-input-wrap">
+                  <User size={15} />
+                  <input
+                    id="chat-cust-name"
+                    type="text"
+                    placeholder="e.g. Sardar Umair"
+                    value={modalName}
+                    onChange={(e) => {
+                      setModalName(e.target.value);
+                      if (modalError) setModalError(null);
+                    }}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="ai-modal-field">
+                <label htmlFor="chat-cust-phone">Phone Number *</label>
+                <div className="ai-modal-input-wrap">
+                  <Phone size={15} />
+                  <input
+                    id="chat-cust-phone"
+                    type="tel"
+                    placeholder="e.g. +92 300 1234567"
+                    value={modalPhone}
+                    onChange={(e) => {
+                      setModalPhone(e.target.value);
+                      if (modalError) setModalError(null);
+                    }}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="ai-modal-field">
+                <label htmlFor="chat-cust-email">Email Address (Optional)</label>
+                <div className="ai-modal-input-wrap">
+                  <Mail size={15} />
+                  <input
+                    id="chat-cust-email"
+                    type="email"
+                    placeholder="e.g. sardarumairnawazkhan@gmail.com"
+                    value={modalEmail}
+                    onChange={(e) => setModalEmail(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {modalError && (
+                <div className="ai-modal-alert error">
+                  <AlertCircle size={14} />
+                  <span>{modalError}</span>
+                </div>
+              )}
+
+              <div className="ai-modal-actions">
+                <button
+                  type="submit"
+                  className="ai-modal-btn primary"
+                  disabled={modalLoading}
+                >
+                  <Sparkles size={15} />
+                  <span>{modalLoading ? 'Saving to Database...' : 'Save to Database'}</span>
+                </button>
+                <button
+                  type="button"
+                  className="ai-modal-btn secondary"
+                  onClick={() => setShowRegModal(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

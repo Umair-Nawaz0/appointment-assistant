@@ -21,10 +21,18 @@ router = APIRouter(prefix="/api/public", tags=["Public Patient Portal"])
 class PublicChatRequest(BaseModel):
     business_id: UUID | None = None
     conversation_id: UUID | None = None
+    customer_id: UUID | None = None
     message: str = Field(min_length=1, max_length=2000)
     customer_name: str | None = None
     customer_phone: str | None = None
     customer_email: str | None = None
+
+
+class PublicCustomerRegisterRequest(BaseModel):
+    business_id: UUID
+    name: str = Field(min_length=1, max_length=120)
+    phone: str = Field(min_length=3, max_length=50)
+    email: str | None = None
 
 
 # ==============================================================================
@@ -77,6 +85,80 @@ async def list_public_businesses() -> dict[str, Any]:
             "timezone": r["timezone"] or "UTC",
         })
     return {"businesses": items}
+
+
+# ==============================================================================
+# 0b. Register Customer for a Selected Business (Stores in PostgreSQL)
+# ==============================================================================
+
+@router.post("/customers/register")
+async def register_public_customer(payload: PublicCustomerRegisterRequest) -> dict[str, Any]:
+    business = await fetchrow(
+        "SELECT id, name, industry, city FROM businesses WHERE id = $1 AND status = 'ACTIVE'",
+        payload.business_id,
+    )
+    if not business:
+        raise AppError(404, "Business not found or inactive.", "BUSINESS_NOT_FOUND")
+
+    clean_name = payload.name.strip()
+    clean_phone = payload.phone.strip()
+    clean_email = payload.email.strip() if payload.email and payload.email.strip() else None
+
+    async with transaction() as conn:
+        existing = await conn.fetchrow(
+            """SELECT id, name, phone, email, created_at
+                 FROM customers
+                WHERE business_id = $1
+                  AND (
+                    (phone IS NOT NULL AND phone = $2) OR
+                    ($3::text IS NOT NULL AND email IS NOT NULL AND email = $3)
+                  )
+                LIMIT 1""",
+            payload.business_id,
+            clean_phone,
+            clean_email,
+        )
+        if existing:
+            customer_id = existing["id"]
+            await conn.execute(
+                """UPDATE customers
+                      SET name = COALESCE($1, name),
+                          phone = COALESCE($2, phone),
+                          email = COALESCE($3, email),
+                          updated_at = CURRENT_TIMESTAMP
+                    WHERE business_id = $4 AND id = $5""",
+                clean_name,
+                clean_phone,
+                clean_email,
+                payload.business_id,
+                customer_id,
+            )
+            created = False
+        else:
+            customer_id = await conn.fetchval(
+                """INSERT INTO customers (business_id, name, phone, email)
+                   VALUES ($1, $2, $3, $4)
+                   RETURNING id""",
+                payload.business_id,
+                clean_name,
+                clean_phone,
+                clean_email,
+            )
+            created = True
+
+    return {
+        "success": True,
+        "created": created,
+        "customer": {
+            "id": str(customer_id),
+            "business_id": str(payload.business_id),
+            "business_name": business["name"],
+            "name": clean_name,
+            "phone": clean_phone,
+            "email": clean_email,
+        },
+        "message": f"Customer successfully {'registered' if created else 'updated'} with {business['name']} in database."
+    }
 
 
 # ==============================================================================
@@ -186,17 +268,57 @@ async def public_chat(payload: PublicChatRequest, request: Request) -> dict[str,
     if not business:
         raise AppError(404, "Clinic is currently inactive or not found.", "NOT_FOUND")
 
-    # 2. Resolve or create conversation
+    # 2. Resolve customer and conversation
     conversation_id = payload.conversation_id or uuid4()
     clean_msg = payload.message.strip()
 
+    resolved_customer_id = payload.customer_id
+    clean_name = payload.customer_name.strip() if payload.customer_name and payload.customer_name.strip() else None
+    clean_phone = payload.customer_phone.strip() if payload.customer_phone and payload.customer_phone.strip() else None
+    clean_email = payload.customer_email.strip() if payload.customer_email and payload.customer_email.strip() else None
+
     async with transaction() as connection:
+        if not resolved_customer_id and (clean_phone or clean_email):
+            cust_row = await connection.fetchrow(
+                """SELECT id, name, phone, email FROM customers
+                    WHERE business_id = $1
+                      AND (
+                        ($2::text IS NOT NULL AND phone = $2) OR
+                        ($3::text IS NOT NULL AND email IS NOT NULL AND email = $3)
+                      )
+                    LIMIT 1""",
+                business_id,
+                clean_phone,
+                clean_email,
+            )
+            if cust_row:
+                resolved_customer_id = cust_row["id"]
+                if clean_name and clean_name != cust_row["name"]:
+                    await connection.execute(
+                        "UPDATE customers SET name = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
+                        clean_name,
+                        resolved_customer_id,
+                    )
+            elif clean_phone:
+                resolved_customer_id = await connection.fetchval(
+                    """INSERT INTO customers (business_id, name, phone, email)
+                       VALUES ($1, $2, $3, $4)
+                       RETURNING id""",
+                    business_id,
+                    clean_name or "Valued Customer",
+                    clean_phone,
+                    clean_email,
+                )
+
         await connection.execute(
-            """INSERT INTO conversations (id, business_id, status)
-               VALUES ($1, $2, 'ACTIVE'::conversation_status)
-               ON CONFLICT (id) DO UPDATE SET last_message_at = CURRENT_TIMESTAMP""",
+            """INSERT INTO conversations (id, business_id, customer_id, status)
+               VALUES ($1, $2, $3, 'ACTIVE'::conversation_status)
+               ON CONFLICT (id) DO UPDATE SET
+                   last_message_at = CURRENT_TIMESTAMP,
+                   customer_id = COALESCE(conversations.customer_id, EXCLUDED.customer_id)""",
             conversation_id,
             business_id,
+            resolved_customer_id,
         )
         await connection.execute(
             """INSERT INTO conversation_state (conversation_id, business_id)
@@ -232,10 +354,11 @@ async def public_chat(payload: PublicChatRequest, request: Request) -> dict[str,
     webhook_body = {
         "business_id": str(business_id),
         "conversation_id": str(conversation_id),
+        "customer_id": str(resolved_customer_id) if resolved_customer_id else None,
         "message": clean_msg,
-        "customer_name": payload.customer_name,
-        "customer_phone": payload.customer_phone,
-        "customer_email": payload.customer_email,
+        "customer_name": clean_name,
+        "customer_phone": clean_phone,
+        "customer_email": clean_email,
     }
 
     try:
@@ -315,20 +438,51 @@ async def public_chat(payload: PublicChatRequest, request: Request) -> dict[str,
 
                 async with transaction() as conn:
                     # Upsert customer
-                    cid = await conn.fetchval(
-                        """INSERT INTO customers (business_id, name, phone)
-                           VALUES ($1, $2, $3)
-                           ON CONFLICT DO NOTHING RETURNING id""",
-                        business_id,
-                        cust_name,
-                        cust_phone,
-                    )
+                    cid = resolved_customer_id
                     if not cid:
                         cid = await conn.fetchval(
-                            "SELECT id FROM customers WHERE business_id = $1 AND phone = $2 LIMIT 1",
+                            """INSERT INTO customers (business_id, name, phone, email)
+                               VALUES ($1, $2, $3, $4)
+                               ON CONFLICT DO NOTHING RETURNING id""",
                             business_id,
+                            cust_name,
                             cust_phone,
+                            clean_email,
                         )
+                        if not cid:
+                            cid = await conn.fetchval(
+                                """SELECT id FROM customers
+                                    WHERE business_id = $1
+                                      AND (phone = $2 OR ($3::text IS NOT NULL AND email = $3))
+                                    LIMIT 1""",
+                                business_id,
+                                cust_phone,
+                                clean_email,
+                            )
+                    else:
+                        await conn.execute(
+                            """UPDATE customers
+                                  SET name = COALESCE(NULLIF($1, 'Valued Patient'), name),
+                                      phone = COALESCE($2, phone),
+                                      email = COALESCE($3, email),
+                                      updated_at = CURRENT_TIMESTAMP
+                                WHERE business_id = $4 AND id = $5""",
+                            cust_name,
+                            cust_phone,
+                            clean_email,
+                            business_id,
+                            cid,
+                        )
+
+                    # Lookup customer email for confirmation if not explicitly provided in message
+                    cust_email_to_notify = clean_email
+                    if not cust_email_to_notify and cid:
+                        c_info = await conn.fetchrow("SELECT email, name FROM customers WHERE id = $1", cid)
+                        if c_info and c_info["email"]:
+                            cust_email_to_notify = c_info["email"]
+                            if not cust_name or cust_name == "Valued Patient":
+                                cust_name = c_info["name"] or cust_name
+
                     # Insert appointment
                     apt_row = await conn.fetchrow(
                         """INSERT INTO appointments (
@@ -381,6 +535,37 @@ async def public_chat(payload: PublicChatRequest, request: Request) -> dict[str,
                     conversation_id,
                     conf_reply,
                 )
+
+                if cust_email_to_notify:
+                    try:
+                        from ..mail import deliver_appointment_email
+                        email_html = f"""
+                        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #1e293b; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px;">
+                          <h2 style="margin-top: 0; color: #0f172a; font-size: 20px; font-weight: 600; border-bottom: 2px solid #0284c7; padding-bottom: 8px;">Appointment Confirmation</h2>
+                          <p style="font-size: 15px; line-height: 1.6; color: #334155;">Dear {cust_name},</p>
+                          <p style="font-size: 15px; line-height: 1.6; color: #334155;">Your appointment with <strong>{business['name']}</strong> has been confirmed. Below are your appointment details:</p>
+                          <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 14px;">
+                            <tr style="border-bottom: 1px solid #e2e8f0;"><td style="padding: 10px 0; font-weight: 600; color: #475569; width: 35%;">Booking Reference</td><td style="padding: 10px 0; color: #0f172a; font-family: monospace;">{str(apt_row['id'])[:8].upper()}</td></tr>
+                            <tr style="border-bottom: 1px solid #e2e8f0;"><td style="padding: 10px 0; font-weight: 600; color: #475569;">Date</td><td style="padding: 10px 0; color: #0f172a;">{b_date.strftime('%A, %B %d, %Y')}</td></tr>
+                            <tr style="border-bottom: 1px solid #e2e8f0;"><td style="padding: 10px 0; font-weight: 600; color: #475569;">Time</td><td style="padding: 10px 0; color: #0f172a;">{b_time.strftime('%I:%M %p')}</td></tr>
+                            <tr style="border-bottom: 1px solid #e2e8f0;"><td style="padding: 10px 0; font-weight: 600; color: #475569;">Location</td><td style="padding: 10px 0; color: #0f172a;">{business['address'] or 'Clinic Reception'}</td></tr>
+                          </table>
+                          <p style="font-size: 14px; line-height: 1.6; color: #334155;">If you need to make any changes or reschedule, please reach out to our office.</p>
+                          <div style="margin-top: 28px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 13px; color: #64748b; line-height: 1.5;">
+                            <strong style="color: #334155;">{business['name']}</strong><br />
+                            {business['address'] or 'Islamabad'}
+                          </div>
+                        </div>
+                        """
+                        await deliver_appointment_email(
+                            to=cust_email_to_notify,
+                            subject=f"Appointment Confirmation — {business['name']}",
+                            html_body=email_html,
+                            sender_name=business["name"],
+                        )
+                        logger.info("Sent appointment confirmation email to %s", cust_email_to_notify)
+                    except Exception as mail_err:
+                        logger.warning("Could not dispatch confirmation email: %s", mail_err)
                 return {
                     "conversation_id": str(conversation_id),
                     "business_id": str(business_id),

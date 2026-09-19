@@ -1,4 +1,5 @@
 import {
+  AlertCircle,
   ArrowRight,
   Bot,
   Building2,
@@ -7,13 +8,17 @@ import {
   Clock,
   ExternalLink,
   Lock,
+  Mail,
   MapPin,
   MessageSquareText,
   Moon,
+  Phone,
   ShieldCheck,
   Sparkles,
   Sun,
+  User,
   UserCheck,
+  UserPlus,
   Users,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -46,6 +51,14 @@ export function LandingPortalPage() {
   const [selectedBusinessId, setSelectedBusinessId] = useState<string>('');
   const [loadingBusinesses, setLoadingBusinesses] = useState(true);
 
+  // Customer state for database registration
+  const [customerName, setCustomerName] = useState(() => sessionStorage.getItem('ai_assistant_customer_name') || '');
+  const [customerPhone, setCustomerPhone] = useState(() => sessionStorage.getItem('ai_assistant_customer_phone') || '');
+  const [customerEmail, setCustomerEmail] = useState(() => sessionStorage.getItem('ai_assistant_customer_email') || '');
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [registerError, setRegisterError] = useState<string | null>(null);
+  const [registerSuccess, setRegisterSuccess] = useState<string | null>(null);
+
   useEffect(() => {
     localStorage.setItem(THEME_STORAGE_KEY, theme);
     document.documentElement.setAttribute('data-theme', theme);
@@ -67,6 +80,65 @@ export function LandingPortalPage() {
   }, []);
 
   const selectedBusiness = businesses.find((b) => b.id === selectedBusinessId) || businesses[0];
+
+  const handleRegisterAndChat = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedBusinessId) return;
+    if (!customerName.trim() || !customerPhone.trim()) {
+      setRegisterError('Please provide your name and phone number.');
+      return;
+    }
+
+    setIsRegistering(true);
+    setRegisterError(null);
+    try {
+      const res = await fetch('/api/public/customers/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          business_id: selectedBusinessId,
+          name: customerName.trim(),
+          phone: customerPhone.trim(),
+          email: customerEmail.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || data.message || 'Failed to save customer');
+      }
+
+      const custId = data.customer?.id;
+      if (custId) sessionStorage.setItem('ai_assistant_customer_id', custId);
+      sessionStorage.setItem('ai_assistant_customer_name', customerName.trim());
+      sessionStorage.setItem('ai_assistant_customer_phone', customerPhone.trim());
+      if (customerEmail.trim()) {
+        sessionStorage.setItem('ai_assistant_customer_email', customerEmail.trim());
+      }
+
+      setRegisterSuccess(
+        `Registered as customer of ${selectedBusiness?.name || 'clinic'} in database! Starting chat...`
+      );
+
+      setTimeout(() => {
+        const p = new URLSearchParams();
+        p.set('business_id', selectedBusinessId);
+        if (custId) p.set('customer_id', custId);
+        p.set('name', customerName.trim());
+        p.set('phone', customerPhone.trim());
+        if (customerEmail.trim()) p.set('email', customerEmail.trim());
+        navigate(`/chat?${p.toString()}`);
+      }, 600);
+    } catch (err: any) {
+      setRegisterError(err.message || 'Could not register customer');
+      setIsRegistering(false);
+    }
+  };
+
+  const handleStartGuestChat = () => {
+    const p = new URLSearchParams();
+    if (selectedBusinessId) p.set('business_id', selectedBusinessId);
+    navigate(`/chat?${p.toString()}`);
+  };
 
   return (
     <div className={`portal-root theme-${theme}`}>
@@ -289,20 +361,118 @@ export function LandingPortalPage() {
               )}
             </div>
 
+            {/* Customer Registration & Database Linkage */}
+            <div className="portal-customer-reg-box">
+              <div className="portal-customer-reg-header">
+                <div className="portal-customer-reg-title">
+                  <UserCheck size={16} />
+                  <span>Register as Customer</span>
+                </div>
+                <span className="portal-customer-badge">PostgreSQL Database</span>
+              </div>
+              <p className="portal-customer-reg-desc">
+                Register your details with <strong>{selectedBusiness ? selectedBusiness.name : 'the selected clinic'}</strong> to store your customer record in the database, view your past history, and book consultations:
+              </p>
+
+              <form onSubmit={handleRegisterAndChat} className="portal-customer-form">
+                <div className="portal-cust-inputs-grid">
+                  <div className="portal-cust-field">
+                    <label htmlFor="cust-name-input">Full Name *</label>
+                    <div className="portal-cust-input-field">
+                      <User size={15} />
+                      <input
+                        id="cust-name-input"
+                        type="text"
+                        placeholder="e.g. Sardar Umair"
+                        value={customerName}
+                        onChange={(e) => {
+                          setCustomerName(e.target.value);
+                          if (registerError) setRegisterError(null);
+                        }}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="portal-cust-field">
+                    <label htmlFor="cust-phone-input">Phone Number *</label>
+                    <div className="portal-cust-input-field">
+                      <Phone size={15} />
+                      <input
+                        id="cust-phone-input"
+                        type="tel"
+                        placeholder="e.g. +92 300 1234567"
+                        value={customerPhone}
+                        onChange={(e) => {
+                          setCustomerPhone(e.target.value);
+                          if (registerError) setRegisterError(null);
+                        }}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="portal-cust-field full-width">
+                    <label htmlFor="cust-email-input">Email Address (Optional for confirmations)</label>
+                    <div className="portal-cust-input-field">
+                      <Mail size={15} />
+                      <input
+                        id="cust-email-input"
+                        type="email"
+                        placeholder="e.g. sardarumairnawazkhan@gmail.com"
+                        value={customerEmail}
+                        onChange={(e) => setCustomerEmail(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {registerError && (
+                  <div className="portal-cust-alert error">
+                    <AlertCircle size={14} />
+                    <span>{registerError}</span>
+                  </div>
+                )}
+                {registerSuccess && (
+                  <div className="portal-cust-alert success">
+                    <CheckCircle2 size={14} />
+                    <span>{registerSuccess}</span>
+                  </div>
+                )}
+
+                <div className="portal-cust-actions-row">
+                  <button
+                    type="submit"
+                    className="portal-btn portal-btn-register-chat"
+                    disabled={isRegistering || !selectedBusinessId}
+                  >
+                    <Sparkles size={16} />
+                    <span>
+                      {isRegistering
+                        ? 'Saving Customer in Database...'
+                        : selectedBusiness
+                        ? `Register as Customer & Chat with ${selectedBusiness.name}`
+                        : 'Register Customer & Start Chat'}
+                    </span>
+                    <ArrowRight size={16} />
+                  </button>
+
+                  <button
+                    type="button"
+                    className="portal-btn portal-btn-guest"
+                    onClick={handleStartGuestChat}
+                    title="Start chat as a guest without pre-registering"
+                  >
+                    <span>Chat as Guest</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+
             <div className="portal-card-actions">
-              <Link
-                to={selectedBusinessId ? `/chat?business_id=${encodeURIComponent(selectedBusinessId)}` : '/chat'}
-                className="portal-btn portal-btn-chat"
-              >
-                <Sparkles size={16} />
-                <span>
-                  {selectedBusiness ? `Chat with ${selectedBusiness.name}` : 'Open Chat Assistant'}
-                </span>
-                <ArrowRight size={16} />
-              </Link>
               <div className="portal-card-footnote">
                 <Clock size={13} />
-                <span>Available 24/7 • Instant responses powered by AI</span>
+                <span>Available 24/7 • Real-time database sync • Powered by AI</span>
               </div>
             </div>
           </div>

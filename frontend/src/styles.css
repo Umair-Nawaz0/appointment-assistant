@@ -3676,3 +3676,453 @@ select.input option {
   }
 }
 
+/* ==============================================================================
+   Customer Registration & Database Storage Styles (Landing & Chat)
+   ============================================================================== */
+
+.portal-customer-reg-box {
+  margin: 14px 0 10px;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--portal-pill-bg);
+  border: 1px solid var(--portal-card-border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.portal-customer-reg-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.portal-customer-reg-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--portal-text-primary);
+}
+
+.portal-customer-reg-title svg {
+  color: #10b981;
+}
+
+.portal-customer-badge {
+  font-size: 0.68rem;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.portal-customer-reg-desc {
+  font-size: 0.79rem;
+  color: var(--portal-text-muted);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.portal-customer-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.portal-cust-inputs-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.portal-cust-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.portal-cust-field.full-width {
+  grid-column: 1 / -1;
+}
+
+.portal-cust-field label {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--portal-text-muted);
+}
+
+.portal-cust-input-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.portal-cust-input-field svg {
+  position: absolute;
+  left: 10px;
+  color: var(--portal-text-muted);
+  pointer-events: none;
+}
+
+.portal-cust-input-field input {
+  width: 100%;
+  padding: 8px 10px 8px 32px;
+  font-size: 0.82rem;
+  border-radius: 8px;
+  border: 1px solid var(--portal-card-border);
+  background: var(--portal-card-bg);
+  color: var(--portal-text-primary);
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.portal-cust-input-field input:focus {
+  border-color: #10b981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+}
+
+.portal-cust-alert {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  padding: 8px 12px;
+  border-radius: 8px;
+  line-height: 1.35;
+}
+
+.portal-cust-alert.error {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.portal-cust-alert.success {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.portal-cust-actions-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.portal-btn-register-chat {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #ffffff;
+  padding: 11px 16px;
+  font-size: 0.88rem;
+  font-weight: 650;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.portal-btn-register-chat:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(16, 185, 129, 0.4);
+}
+
+.portal-btn-register-chat:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.portal-btn-guest {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 14px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--portal-text-muted);
+  border: 1px dashed var(--portal-card-border);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.portal-btn-guest:hover {
+  background: var(--portal-pill-bg);
+  color: var(--portal-text-primary);
+  border-color: var(--portal-text-muted);
+}
+
+/* Chat Header Customer Chip & Register Pill */
+.ai-stage-cust-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  font-size: 0.76rem;
+  color: var(--portal-text-primary, #0f172a);
+}
+
+.ai-stage-cust-chip-icon {
+  color: #10b981;
+  flex-shrink: 0;
+}
+
+.ai-stage-cust-chip-info {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ai-stage-cust-chip-name {
+  font-weight: 700;
+}
+
+.ai-stage-cust-chip-phone {
+  font-size: 0.72rem;
+  opacity: 0.85;
+}
+
+.ai-stage-cust-chip-tag {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #10b981;
+  color: #ffffff;
+}
+
+.ai-stage-cust-chip-edit {
+  background: transparent;
+  border: none;
+  font-size: 0.7rem;
+  color: #10b981;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0 2px;
+}
+
+.ai-stage-cust-reg-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.ai-stage-cust-reg-btn:hover {
+  background: #10b981;
+  color: #ffffff;
+}
+
+/* Modal Overlay for In-Chat Customer Registration */
+.ai-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.ai-modal-card {
+  width: 100%;
+  max-width: 440px;
+  background: var(--portal-card-bg, #ffffff);
+  border: 1px solid var(--portal-card-border, #e2e8f0);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: aiModalFadeIn 0.2s ease-out;
+}
+
+@keyframes aiModalFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.ai-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ai-modal-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--portal-text-primary, #0f172a);
+}
+
+.ai-modal-title svg {
+  color: #10b981;
+}
+
+.ai-modal-close {
+  background: transparent;
+  border: none;
+  color: var(--portal-text-muted, #64748b);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+}
+
+.ai-modal-close:hover {
+  color: var(--portal-text-primary, #0f172a);
+  background: var(--portal-pill-bg, #f1f5f9);
+}
+
+.ai-modal-subtitle {
+  font-size: 0.82rem;
+  color: var(--portal-text-muted, #64748b);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.ai-modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ai-modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ai-modal-field label {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--portal-text-muted, #64748b);
+}
+
+.ai-modal-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.ai-modal-input-wrap svg {
+  position: absolute;
+  left: 12px;
+  color: var(--portal-text-muted, #64748b);
+  pointer-events: none;
+}
+
+.ai-modal-input-wrap input {
+  width: 100%;
+  padding: 9px 12px 9px 34px;
+  font-size: 0.85rem;
+  border-radius: 8px;
+  border: 1px solid var(--portal-card-border, #cbd5e1);
+  background: var(--portal-pill-bg, #f8fafc);
+  color: var(--portal-text-primary, #0f172a);
+  outline: none;
+}
+
+.ai-modal-input-wrap input:focus {
+  border-color: #10b981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+}
+
+.ai-modal-alert {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+
+.ai-modal-alert.error {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.ai-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.ai-modal-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.ai-modal-btn.primary {
+  background: #10b981;
+  color: #ffffff;
+  border: none;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+}
+
+.ai-modal-btn.primary:hover:not(:disabled) {
+  background: #059669;
+}
+
+.ai-modal-btn.primary:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.ai-modal-btn.secondary {
+  background: transparent;
+  color: var(--portal-text-muted, #64748b);
+  border: 1px solid var(--portal-card-border, #cbd5e1);
+}
+
+.ai-modal-btn.secondary:hover {
+  background: var(--portal-pill-bg, #f1f5f9);
+  color: var(--portal-text-primary, #0f172a);
+}
+
