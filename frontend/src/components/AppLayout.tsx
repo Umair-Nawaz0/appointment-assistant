@@ -1,4 +1,18 @@
-import { Bot, CalendarDays, ChevronDown, Clock3, ContactRound, ExternalLink, Home, LayoutDashboard, LogOut, Menu, MessageSquareText, Moon, Settings2, Sparkles, Store, Sun, X } from 'lucide-react';
+import {
+  CalendarDays,
+  Clock3,
+  ContactRound,
+  Home,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  MessageSquareText,
+  Moon,
+  Settings2,
+  Store,
+  Sun,
+  X
+} from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -42,17 +56,9 @@ export function AppLayout() {
           <span className="brand-mark">A</span>
           <div>
             <strong>Appointment</strong>
-            <small>Assistant</small>
+            <small>Admin Console</small>
           </div>
         </div>
-
-        <Link to="/chat" target="_blank" rel="noopener noreferrer" className="sidebar-patient-btn" title="Open patient booking and chat page in new tab">
-          <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Sparkles size={16} />
-            <span>Patient Portal</span>
-          </span>
-          <ExternalLink size={13} />
-        </Link>
 
         <nav>
           {links.map(({ to, label, icon: Icon, end }) => (
@@ -62,7 +68,7 @@ export function AppLayout() {
             </NavLink>
           ))}
         </nav>
-        <button className="account" onClick={signOut}>
+        <button className="account" onClick={signOut} title="Click to Sign Out">
           <span className="avatar">{business?.businessName?.[0]?.toUpperCase()}</span>
           <span>
             <strong>{business?.businessName}</strong>
@@ -76,13 +82,12 @@ export function AppLayout() {
           <div className="topbar-left-actions">
             <Link to="/" className="topbar-portal-link" title="Return to Portal Selection">
               <Home size={14} />
-              <span>Portal Home</span>
+              <span>Main Portal</span>
             </Link>
-            <Link to="/chat" target="_blank" rel="noopener noreferrer" className="topbar-patient-link" title="Open live patient chat interface">
-              <Bot size={15} />
-              <span>Patient Chat View</span>
-              <ExternalLink size={12} />
-            </Link>
+            <div className="topbar-badge-online">
+              <span className="status-dot" />
+              <span>System Online</span>
+            </div>
           </div>
           
           <div className="topbar-actions">
@@ -91,10 +96,10 @@ export function AppLayout() {
                 type="button"
                 className={`admin-theme-opt ${theme === 'light' ? 'active' : ''}`}
                 onClick={() => setTheme('light')}
-                title="White Background"
+                title="Light Background"
               >
                 <Sun size={13} />
-                <span>White</span>
+                <span>Light</span>
               </button>
               <button
                 type="button"
@@ -111,7 +116,9 @@ export function AppLayout() {
               <small>Workspace</small>
               <strong>{business?.businessName}</strong>
             </div>
-            <ChevronDown size={17} />
+            <button className="topbar-logout-btn" onClick={signOut} title="Sign out">
+              <LogOut size={16} />
+            </button>
           </div>
         </div>
         <div className="content">

@@ -1,4 +1,4 @@
-import { Bot, CalendarCheck2, Clock3, ContactRound, ExternalLink, MessageSquareText, Settings2, TrendingUp, type LucideIcon } from 'lucide-react';
+import { CalendarCheck2, Clock3, ContactRound, MessageSquareText, Settings2, TrendingUp, type LucideIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, Empty, PageHeader, Spinner, Badge } from '../components/ui';
@@ -34,15 +34,15 @@ export function DashboardPage() {
   return (
     <>
       <PageHeader
-        title="Good to see you"
-        description="Here’s what is happening across your AI assistant today."
+        title="Operations Overview"
+        description="Monitor real-time appointments, patient conversations, and booking schedules."
         action={
           <div style={{ display: 'flex', gap: '10px' }}>
-            <Link className="button button-secondary" to="/chat" target="_blank" rel="noopener noreferrer">
-              <ExternalLink size={15} /> Patient Chat View
+            <Link className="button button-secondary" to="/conversations">
+              <MessageSquareText size={15} /> All Conversations
             </Link>
             <Link className="button" to="/appointments">
-              New appointment
+              <CalendarCheck2 size={15} /> Book Appointment
             </Link>
           </div>
         }
@@ -63,9 +63,9 @@ export function DashboardPage() {
           <div className="section-head">
             <div>
               <h2>Upcoming appointments</h2>
-              <p>Your next confirmed and pending bookings.</p>
+              <p>Next scheduled patient appointments and consultations.</p>
             </div>
-            <Link to="/appointments">View all</Link>
+            <Link to="/appointments">View all &rarr;</Link>
           </div>
           {data.upcoming.length ? (
             <div className="list">
@@ -90,25 +90,25 @@ export function DashboardPage() {
         <Card className="setup-card">
           <div className="section-head">
             <div>
-              <h2>Assistant configuration</h2>
-              <p>Essentials for your website booking assistant.</p>
+              <h2>System Status</h2>
+              <p>Operational health & quick controls</p>
             </div>
             <Settings2 size={22} />
           </div>
           <div className="readiness">
             <div>
-              <span>Website AI Assistant</span>
-              <strong>Active & Ready</strong>
+              <span>AI Booking Agent</span>
+              <span className="badge badge-green">Operational</span>
             </div>
-            <p className="readiness-help">Visitors can chat naturally, check live availability, and schedule appointments directly on your website.</p>
-            <Link className="button" to="/chat" target="_blank" rel="noopener noreferrer">
-              <Bot size={16} /> Open Patient Chat Portal
+            <p className="readiness-help">The AI assistant is active, qualifying patients and booking appointments according to your operating hours.</p>
+            <Link className="button" to="/conversations">
+              <MessageSquareText size={16} /> View Live Conversations
             </Link>
             <Link className="button button-secondary" to="/availability">
-              <Clock3 size={16} /> Manage opening hours
+              <Clock3 size={16} /> Manage Schedule
             </Link>
             <Link className="text-link" to="/settings">
-              Manage booking policies
+              Edit Booking Rules &rarr;
             </Link>
           </div>
         </Card>

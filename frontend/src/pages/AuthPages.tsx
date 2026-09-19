@@ -7,10 +7,10 @@ import { Button, Field, Input, Notice } from '../components/ui';
 
 function AuthShell({eyebrow,title,subtitle,children}:{eyebrow:string;title:string;subtitle:string;children:React.ReactNode}){
   return <div className="auth-shell"><section className="auth-panel">
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
       <Link className="auth-brand" to="/"><span className="brand-mark">A</span><strong>Appointment Assistant</strong></Link>
-      <Link to="/chat" style={{ fontSize: '0.8rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
-        <span>Patient Chat</span> &rarr;
+      <Link to="/" style={{ fontSize: '0.8rem', color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: '4px', textDecoration: 'none' }}>
+        <span>&larr; Portal</span>
       </Link>
     </div>
     <div className="auth-copy"><span className="eyebrow">{eyebrow}</span><h1>{title}</h1><p>{subtitle}</p>{children}</div>
