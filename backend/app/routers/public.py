@@ -41,6 +41,45 @@ async def get_default_business_id() -> UUID:
 
 
 # ==============================================================================
+# 0. Public Businesses List (For Customer Selection)
+# ==============================================================================
+
+@router.get("/businesses")
+async def list_public_businesses() -> dict[str, Any]:
+    rows = await fetch(
+        """SELECT id, name, email, address, city, state_province, postal_code,
+                  country_code, timezone, industry
+             FROM businesses
+            WHERE status = 'ACTIVE'
+            ORDER BY name ASC"""
+    )
+    items = []
+    for r in rows:
+        address_parts = [
+            part
+            for part in [
+                r["address"],
+                r["city"],
+                r["state_province"],
+                r["postal_code"],
+                r["country_code"],
+            ]
+            if part
+        ]
+        formatted_address = ", ".join(address_parts) if address_parts else "Address not specified"
+        items.append({
+            "id": str(r["id"]),
+            "name": r["name"],
+            "email": r["email"],
+            "industry": r["industry"] or "Healthcare & Services",
+            "address": formatted_address,
+            "city": r["city"] or "",
+            "timezone": r["timezone"] or "UTC",
+        })
+    return {"businesses": items}
+
+
+# ==============================================================================
 # 1. Public Clinic / Business Info (For Patient Chat Header & Modal)
 # ==============================================================================
 

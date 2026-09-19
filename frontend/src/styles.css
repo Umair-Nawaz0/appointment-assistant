@@ -2062,6 +2062,67 @@ select.input option {
   color: #38bdf8;
 }
 
+/* Business/Company Switcher in Chat Header */
+.ai-stage-biz-selector {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  background: var(--ai-chip-bg);
+  border: 1px solid var(--ai-header-border);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  flex-shrink: 0;
+  max-width: 280px;
+}
+
+.ai-stage-biz-icon {
+  color: #0284c7;
+  flex-shrink: 0;
+}
+
+.ai-stage-canvas.theme-dark .ai-stage-biz-icon {
+  color: #38bdf8;
+}
+
+.ai-stage-biz-label {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--ai-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+.ai-stage-biz-dropdown {
+  background: transparent;
+  color: var(--ai-text);
+  border: none;
+  font-size: 0.82rem;
+  font-weight: 650;
+  outline: none;
+  cursor: pointer;
+  max-width: 170px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 2px 4px;
+  border-radius: 6px;
+}
+
+.ai-stage-biz-dropdown:focus {
+  background: rgba(56, 189, 248, 0.12);
+}
+
+.ai-stage-biz-dropdown option {
+  background: #ffffff;
+  color: #0f172a;
+}
+
+.ai-stage-canvas.theme-dark .ai-stage-biz-dropdown option {
+  background: #1e293b;
+  color: #f8fafc;
+}
+
 .ai-stage-header-actions {
   display: flex;
   align-items: center;
@@ -2827,6 +2888,18 @@ select.input option {
     height: 30px;
     border-radius: 8px;
   }
+  .ai-stage-biz-selector {
+    max-width: 155px;
+    padding: 3px 6px;
+    gap: 4px;
+  }
+  .ai-stage-biz-label {
+    display: none;
+  }
+  .ai-stage-biz-dropdown {
+    max-width: 110px;
+    font-size: 0.74rem;
+  }
   .ai-stage-bubble-wrap {
     max-width: 90%;
   }
@@ -2861,6 +2934,13 @@ select.input option {
   }
   .ai-stage-title {
     font-size: 0.8rem;
+  }
+  .ai-stage-biz-selector {
+    max-width: 120px;
+  }
+  .ai-stage-biz-dropdown {
+    max-width: 85px;
+    font-size: 0.7rem;
   }
   .ai-stage-theme-opt {
     padding: 3px 6px;
@@ -3331,6 +3411,141 @@ select.input option {
 .portal-btn-secondary:hover {
   background: var(--portal-pill-bg);
   color: inherit;
+}
+
+/* Business Selection Box on Landing Portal */
+.portal-business-box {
+  margin: 18px 0 16px 0;
+  padding: 16px;
+  border-radius: 14px;
+  background: var(--portal-pill-bg);
+  border: 1px solid var(--portal-card-border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.portal-business-box-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--portal-text-primary);
+}
+
+.portal-business-box-label svg {
+  color: #10b981;
+}
+
+.portal-business-box-help {
+  font-size: 0.8rem;
+  color: var(--portal-text-muted);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.portal-business-select-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.portal-business-select {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  background: var(--portal-card-bg);
+  color: var(--portal-text-primary);
+  border: 1.5px solid var(--portal-card-border);
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.portal-business-select:hover {
+  border-color: #10b981;
+}
+
+.portal-business-select:focus {
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+}
+
+.portal-business-select option {
+  background: var(--portal-card-bg);
+  color: var(--portal-text-primary);
+}
+
+.portal-business-loading {
+  font-size: 0.82rem;
+  color: var(--portal-text-muted);
+  font-style: italic;
+  padding: 6px 0;
+}
+
+.portal-selected-business-card {
+  margin-top: 2px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(16, 185, 129, 0.07);
+  border: 1px solid rgba(16, 185, 129, 0.22);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.portal-root.theme-dark .portal-selected-business-card {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.portal-selected-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.portal-selected-name {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--portal-text-primary);
+}
+
+.portal-selected-badge {
+  font-size: 0.7rem;
+  font-weight: 650;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #10b981;
+  color: #ffffff;
+  letter-spacing: 0.02em;
+}
+
+.portal-selected-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.76rem;
+  color: var(--portal-text-muted);
+}
+
+.portal-selected-city {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.portal-selected-status {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #10b981;
+  font-weight: 600;
 }
 
 .portal-btn-chat {

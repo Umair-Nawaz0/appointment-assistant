@@ -7,6 +7,7 @@ import {
   Clock,
   ExternalLink,
   Lock,
+  MapPin,
   MessageSquareText,
   Moon,
   ShieldCheck,
@@ -22,6 +23,16 @@ import agentImg from '../assets/agent_hd.png';
 
 const THEME_STORAGE_KEY = 'ai_assistant_theme';
 
+type PublicBusiness = {
+  id: string;
+  name: string;
+  email: string;
+  industry: string;
+  address: string;
+  city: string;
+  timezone: string;
+};
+
 export function LandingPortalPage() {
   const { business, loading } = useAuth();
   const navigate = useNavigate();
@@ -31,10 +42,31 @@ export function LandingPortalPage() {
     return saved === 'dark' ? 'dark' : 'light';
   });
 
+  const [businesses, setBusinesses] = useState<PublicBusiness[]>([]);
+  const [selectedBusinessId, setSelectedBusinessId] = useState<string>('');
+  const [loadingBusinesses, setLoadingBusinesses] = useState(true);
+
   useEffect(() => {
     localStorage.setItem(THEME_STORAGE_KEY, theme);
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    fetch('/api/public/businesses')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.businesses && Array.isArray(data.businesses)) {
+          setBusinesses(data.businesses);
+          if (data.businesses.length > 0) {
+            setSelectedBusinessId(data.businesses[0].id);
+          }
+        }
+      })
+      .catch((err) => console.warn('Could not load businesses:', err))
+      .finally(() => setLoadingBusinesses(false));
+  }, []);
+
+  const selectedBusiness = businesses.find((b) => b.id === selectedBusinessId) || businesses[0];
 
   return (
     <div className={`portal-root theme-${theme}`}>
@@ -207,10 +239,65 @@ export function LandingPortalPage() {
               </li>
             </ul>
 
+            {/* Business / Company Selector */}
+            <div className="portal-business-box">
+              <div className="portal-business-box-label">
+                <Building2 size={15} />
+                <span>Select Business / Company</span>
+              </div>
+              <p className="portal-business-box-help">
+                Choose which clinic or company you want to book with or become a customer of:
+              </p>
+
+              {loadingBusinesses ? (
+                <div className="portal-business-loading">Loading registered businesses...</div>
+              ) : businesses.length === 0 ? (
+                <div className="portal-business-loading">No active businesses available</div>
+              ) : (
+                <div className="portal-business-select-wrap">
+                  <select
+                    className="portal-business-select"
+                    value={selectedBusinessId}
+                    onChange={(e) => setSelectedBusinessId(e.target.value)}
+                    aria-label="Select business or company"
+                  >
+                    {businesses.map((biz) => (
+                      <option key={biz.id} value={biz.id}>
+                        {biz.name} — {biz.industry || 'Healthcare'}{biz.city ? ` (${biz.city})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {selectedBusiness && (
+                <div className="portal-selected-business-card">
+                  <div className="portal-selected-top">
+                    <span className="portal-selected-name">{selectedBusiness.name}</span>
+                    <span className="portal-selected-badge">{selectedBusiness.industry || 'Healthcare'}</span>
+                  </div>
+                  <div className="portal-selected-meta">
+                    <span className="portal-selected-city">
+                      <MapPin size={12} />
+                      {selectedBusiness.city || selectedBusiness.address || 'Online Clinic'}
+                    </span>
+                    <span className="portal-selected-status">
+                      <span className="portal-pulse-dot" /> AI Assistant Online
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div className="portal-card-actions">
-              <Link to="/chat" className="portal-btn portal-btn-chat">
+              <Link
+                to={selectedBusinessId ? `/chat?business_id=${encodeURIComponent(selectedBusinessId)}` : '/chat'}
+                className="portal-btn portal-btn-chat"
+              >
                 <Sparkles size={16} />
-                <span>Open Chat Assistant</span>
+                <span>
+                  {selectedBusiness ? `Chat with ${selectedBusiness.name}` : 'Open Chat Assistant'}
+                </span>
                 <ArrowRight size={16} />
               </Link>
               <div className="portal-card-footnote">

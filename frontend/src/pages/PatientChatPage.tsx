@@ -49,6 +49,16 @@ type ClinicInfo = {
   };
 };
 
+type PublicBusiness = {
+  id: string;
+  name: string;
+  email: string;
+  industry: string;
+  address: string;
+  city: string;
+  timezone: string;
+};
+
 const THEME_STORAGE_KEY = 'ai_assistant_theme';
 const CONV_STORAGE_KEY = 'ai_assistant_conv_id';
 
@@ -61,7 +71,7 @@ const QUICK_ACTIONS = [
 ];
 
 export function PatientChatPage() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const businessIdParam = searchParams.get('business_id');
 
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -69,6 +79,7 @@ export function PatientChatPage() {
     return saved === 'dark' ? 'dark' : 'light';
   });
 
+  const [businesses, setBusinesses] = useState<PublicBusiness[]>([]);
   const [clinic, setClinic] = useState<ClinicInfo | null>(null);
   const [conversationId, setConversationId] = useState<string>(() => {
     const saved = sessionStorage.getItem(CONV_STORAGE_KEY);
@@ -312,6 +323,35 @@ export function PatientChatPage() {
     ]);
   };
 
+  // Fetch available businesses for company selector
+  useEffect(() => {
+    fetch('/api/public/businesses')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.businesses && Array.isArray(data.businesses)) {
+          setBusinesses(data.businesses);
+        }
+      })
+      .catch((err) => console.warn('Could not fetch businesses list:', err));
+  }, []);
+
+  const handleSwitchBusiness = (newBusinessId: string) => {
+    if (!newBusinessId || newBusinessId === (clinic?.business?.id || businessIdParam)) return;
+    setSearchParams({ business_id: newBusinessId });
+    const targetBiz = businesses.find((b) => b.id === newBusinessId);
+    const newConvId = crypto.randomUUID();
+    setConversationId(newConvId);
+    sessionStorage.setItem(CONV_STORAGE_KEY, newConvId);
+    setMessages([
+      {
+        id: crypto.randomUUID(),
+        sender: 'assistant',
+        text: `Switched clinic to ${targetBiz?.name || 'selected company'}. Hello! I am your AI Appointment Assistant for ${targetBiz?.name || 'our practice'}. How can I assist you with your booking today?`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      },
+    ]);
+  };
+
   return (
     <div className={`ai-stage-canvas theme-${theme}`}>
       {/* Background ambient gradient lighting */}
@@ -327,6 +367,26 @@ export function PatientChatPage() {
           </span>
           <span className="ai-stage-badge">Public • No Login Required</span>
         </div>
+
+        {/* Company / Clinic Selector */}
+        {businesses.length > 0 && (
+          <div className="ai-stage-biz-selector" title="Select or switch company / clinic">
+            <Building2 size={13} className="ai-stage-biz-icon" />
+            <span className="ai-stage-biz-label">Company:</span>
+            <select
+              className="ai-stage-biz-dropdown"
+              value={clinic?.business?.id || businessIdParam || (businesses[0]?.id ?? '')}
+              onChange={(e) => handleSwitchBusiness(e.target.value)}
+              aria-label="Switch company or clinic"
+            >
+              {businesses.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}{b.city ? ` (${b.city})` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <div className="ai-stage-header-actions">
           {/* Link back to Portal Home */}
