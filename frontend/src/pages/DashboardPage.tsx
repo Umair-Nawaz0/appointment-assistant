@@ -1,4 +1,4 @@
-import { CalendarCheck2, Clock3, ContactRound, MessageSquareText, Settings2, TrendingUp, type LucideIcon } from 'lucide-react';
+import { Bot, CalendarCheck2, Clock3, ContactRound, ExternalLink, MessageSquareText, Settings2, TrendingUp, type LucideIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, Empty, PageHeader, Spinner, Badge } from '../components/ui';
@@ -36,7 +36,16 @@ export function DashboardPage() {
       <PageHeader
         title="Good to see you"
         description="Here’s what is happening across your AI assistant today."
-        action={<Link className="button" to="/appointments">New appointment</Link>}
+        action={
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <Link className="button button-secondary" to="/chat" target="_blank" rel="noopener noreferrer">
+              <ExternalLink size={15} /> Patient Chat View
+            </Link>
+            <Link className="button" to="/appointments">
+              New appointment
+            </Link>
+          </div>
+        }
       />
       <div className="metrics">
         {metrics.map(({ label, value, Icon, tone }) => (
@@ -92,8 +101,15 @@ export function DashboardPage() {
               <strong>Active & Ready</strong>
             </div>
             <p className="readiness-help">Visitors can chat naturally, check live availability, and schedule appointments directly on your website.</p>
-            <Link className="button button-secondary" to="/availability"><Clock3 size={16} /> Manage opening hours</Link>
-            <Link className="text-link" to="/settings">Manage booking policies</Link>
+            <Link className="button" to="/chat" target="_blank" rel="noopener noreferrer">
+              <Bot size={16} /> Open Patient Chat Portal
+            </Link>
+            <Link className="button button-secondary" to="/availability">
+              <Clock3 size={16} /> Manage opening hours
+            </Link>
+            <Link className="text-link" to="/settings">
+              Manage booking policies
+            </Link>
           </div>
         </Card>
       </div>

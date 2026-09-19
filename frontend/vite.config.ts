@@ -15,6 +15,10 @@ export default defineConfig(({ mode }) => {
           target: env.VITE_BACKEND_URL || 'http://127.0.0.1:4000',
           changeOrigin: true,
         },
+        '/webhook': {
+          target: 'http://127.0.0.1:5678',
+          changeOrigin: true,
+        },
       },
     },
     build: {

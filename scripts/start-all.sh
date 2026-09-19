@@ -91,7 +91,8 @@ if [ -n "${n8n_container}" ]; then
       " >/dev/null 2>&1 || true
       docker exec "${n8n_container}" n8n import:workflow --input=/tmp/wf_import.json >/dev/null 2>&1 || true
       docker exec "${n8n_container}" rm -f /tmp/wf_import.json >/dev/null 2>&1 || true
-      echo "✓ Imported website-workflow.json into n8n"
+      docker exec "${n8n_container}" n8n publish:workflow --id=ApptAssistant01 >/dev/null 2>&1 || true
+      echo "✓ Imported and activated website-workflow in n8n"
     fi
   else
     echo "n8n took longer to start; credentials/workflow can be imported once container is fully initialized."
