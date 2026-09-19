@@ -7,9 +7,17 @@ import { Button, Field, Input, Notice } from '../components/ui';
 
 function AuthShell({eyebrow,title,subtitle,children}:{eyebrow:string;title:string;subtitle:string;children:React.ReactNode}){
   return <div className="auth-shell"><section className="auth-panel">
-    <Link className="auth-brand" to="/"><span className="brand-mark">A</span><strong>Appointment Assistant</strong></Link>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+      <Link className="auth-brand" to="/"><span className="brand-mark">A</span><strong>Appointment Assistant</strong></Link>
+      <Link to="/chat" style={{ fontSize: '0.8rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
+        <span>Patient Chat</span> &rarr;
+      </Link>
+    </div>
     <div className="auth-copy"><span className="eyebrow">{eyebrow}</span><h1>{title}</h1><p>{subtitle}</p>{children}</div>
-    <small className="auth-footer">Secure business workspace</small>
+    <div style={{ marginTop: 'auto', paddingTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--line)' }}>
+      <small className="auth-footer">Secure company workspace</small>
+      <Link to="/" style={{ fontSize: '0.78rem', color: 'var(--muted)' }}>&larr; Back to Portal</Link>
+    </div>
   </section><aside className="auth-art"><div className="art-orb art-one"/><div className="art-orb art-two"/><div className="quote-card"><CalendarCheck2 size={28}/><h2>One calm place for every appointment.</h2><p>Manage conversations, customers, availability, and bookings without losing the human touch.</p><div className="mini-stats"><span><strong>6</strong>channels</span><span><strong>24/7</strong>ready</span><span><strong>1</strong>inbox</span></div></div></aside></div>;
 }
 
@@ -19,8 +27,8 @@ function PasswordInput({value,onChange,autoComplete='current-password'}:{value:s
 
 export function LoginPage(){
   const {business,login}=useAuth();const navigate=useNavigate();const [email,setEmail]=useState('');const [password,setPassword]=useState('');const [error,setError]=useState('');const [busy,setBusy]=useState(false);
-  if(business)return <Navigate to="/" replace/>;
-  const submit=async(e:FormEvent)=>{e.preventDefault();setError('');setBusy(true);try{await login(email,password);navigate('/');}catch(err){setError(err instanceof Error?err.message:'Unable to sign in.');}finally{setBusy(false)}};
+  if(business)return <Navigate to="/dashboard" replace/>;
+  const submit=async(e:FormEvent)=>{e.preventDefault();setError('');setBusy(true);try{await login(email,password);navigate('/dashboard');}catch(err){setError(err instanceof Error?err.message:'Unable to sign in.');}finally{setBusy(false)}};
   return <AuthShell eyebrow="Welcome back" title="Sign in to your workspace" subtitle="Your customers and schedule are waiting."><form className="auth-form" onSubmit={submit}>{error&&<Notice kind="error">{error}</Notice>}<Field label="Business email"><Input type="email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email" required/></Field><Field label="Password"><PasswordInput value={password} onChange={setPassword}/></Field><div className="form-row between"><label className="check"><input type="checkbox"/>Remember me</label><Link to="/forgot-password">Forgot password?</Link></div><Button disabled={busy}>{busy?'Signing in…':<>Sign in <ArrowRight size={17}/></>}</Button><p className="form-switch">New here? <Link to="/signup">Create your workspace</Link></p></form></AuthShell>;
 }
 

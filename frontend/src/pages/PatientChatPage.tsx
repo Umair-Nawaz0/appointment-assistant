@@ -1,10 +1,12 @@
 import {
+  Building2,
   Calendar,
   CalendarCheck2,
   CheckCircle2,
   Clock,
   Download,
   ExternalLink,
+  Home,
   MapPin,
   Moon,
   RefreshCw,
@@ -323,10 +325,22 @@ export function PatientChatPage() {
           <span className="ai-stage-title">
             {clinic?.business?.name ? `${clinic.business.name} Assistant` : 'CareSync AI Assistant'}
           </span>
-          <span className="ai-stage-badge">Active 24/7</span>
+          <span className="ai-stage-badge">Public • No Login Required</span>
         </div>
 
         <div className="ai-stage-header-actions">
+          {/* Link back to Portal Home */}
+          <Link to="/" className="ai-stage-nav-pill" title="Return to Portal Selection">
+            <Home size={13} />
+            <span>Portal Home</span>
+          </Link>
+
+          {/* Link to Company / Staff Portal */}
+          <Link to="/login" className="ai-stage-nav-pill company-pill" title="Company & Staff Sign In">
+            <Building2 size={13} />
+            <span>Company Portal</span>
+          </Link>
+
           {/* Background Choice Switch (White / Dark) */}
           <div className="ai-stage-theme-switch" role="radiogroup" aria-label="Choose Background Color">
             <button
@@ -358,10 +372,6 @@ export function PatientChatPage() {
           >
             <RotateCcw size={15} />
           </button>
-
-          <Link to="/login" className="ai-stage-staff-link" title="Staff Portal">
-            <User size={14} />
-          </Link>
         </div>
       </header>
 

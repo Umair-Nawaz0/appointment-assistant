@@ -4,7 +4,7 @@ import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const links = [
-  { to: '/', label: 'Overview', icon: LayoutDashboard, end: true },
+  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/appointments', label: 'Appointments', icon: CalendarDays },
   { to: '/customers', label: 'Customers', icon: ContactRound },
   { to: '/conversations', label: 'Conversations', icon: MessageSquareText },

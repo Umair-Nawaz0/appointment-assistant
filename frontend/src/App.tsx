@@ -8,12 +8,13 @@ import { BusinessPage, SettingsPage } from './pages/BusinessPages';
 import { ConversationsPage } from './pages/ConversationsPage';
 import { CustomersPage } from './pages/CustomersPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { LandingPortalPage } from './pages/LandingPortalPage';
 import { PatientChatPage } from './pages/PatientChatPage';
 
 export function App() {
   return (
     <Routes>
-      <Route path="/" element={<PatientChatPage />} />
+      <Route path="/" element={<LandingPortalPage />} />
       <Route path="/chat" element={<PatientChatPage />} />
       <Route path="/book" element={<PatientChatPage />} />
       <Route path="/login" element={<LoginPage />} />
