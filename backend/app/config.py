@@ -36,6 +36,7 @@ class Settings:
     pg_user: str = os.getenv("PGUSER", "umair")
     pg_password: str | None = os.getenv("PGPASSWORD", "postgres") or None
     backend_api_key: str = os.getenv("BACKEND_API_KEY", "appt_dcef54701d6e66eba727d4061616c70be6f1a8a450234f09ba585470e931c891")
+    n8n_webhook_base_url: str = os.getenv("N8N_WEBHOOK_BASE_URL", os.getenv("N8N_WEBHOOK_URL", os.getenv("WEBHOOK_URL", "http://127.0.0.1:5678"))).rstrip("/")
     session_cookie_name: str = os.getenv("SESSION_COOKIE_NAME", "appointment_session")
     session_ttl_days: int = _int("SESSION_TTL_DAYS", 7)
     verification_ttl_minutes: int = _int("EMAIL_VERIFICATION_CODE_TTL_MINUTES", 15)
@@ -55,6 +56,7 @@ class Settings:
     gmail_client_id: str | None = os.getenv("GMAIL_CLIENT_ID") or None
     gmail_client_secret: str | None = os.getenv("GMAIL_CLIENT_SECRET") or None
     gmail_refresh_token: str | None = os.getenv("GMAIL_REFRESH_TOKEN") or None
+    gemini_api_key: str | None = os.getenv("GEMINI_API_KEY") or None
 
     @property
     def production(self) -> bool:

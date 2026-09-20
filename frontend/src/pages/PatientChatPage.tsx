@@ -1,30 +1,24 @@
 import {
   AlertCircle,
-  Building2,
+  Bot,
   Calendar,
   CalendarCheck2,
   CheckCircle2,
   Clock,
   Download,
-  ExternalLink,
-  Home,
   Mail,
   MapPin,
   Moon,
   Phone,
   RefreshCw,
-  RotateCcw,
   Send,
   Sparkles,
   Sun,
   User,
-  UserCheck,
-  UserPlus,
   X,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import agentImg from '../assets/agent_hd.png';
+import { useSearchParams } from 'react-router-dom';
 
 type Message = {
   id: string;
@@ -55,29 +49,11 @@ type ClinicInfo = {
   };
 };
 
-type PublicBusiness = {
-  id: string;
-  name: string;
-  email: string;
-  industry: string;
-  address: string;
-  city: string;
-  timezone: string;
-};
-
 const THEME_STORAGE_KEY = 'ai_assistant_theme';
 const CONV_STORAGE_KEY = 'ai_assistant_conv_id';
 
-const QUICK_ACTIONS = [
-  { label: 'Book an appointment', prompt: 'I want to book an appointment' },
-  { label: 'Available times today', prompt: 'What appointment times are open today?' },
-  { label: 'Available times tomorrow', prompt: 'What times are available tomorrow?' },
-  { label: 'Clinic hours & location', prompt: 'What are your clinic hours and address?' },
-  { label: 'Reschedule / Cancel', prompt: 'I need to reschedule or cancel my appointment' },
-];
-
 export function PatientChatPage() {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const businessIdParam = searchParams.get('business_id');
 
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -85,7 +61,6 @@ export function PatientChatPage() {
     return saved === 'dark' ? 'dark' : 'light';
   });
 
-  const [businesses, setBusinesses] = useState<PublicBusiness[]>([]);
   const [clinic, setClinic] = useState<ClinicInfo | null>(null);
 
   // Customer state & database linkage
@@ -144,16 +119,7 @@ export function PatientChatPage() {
 
   const [input, setInput] = useState('');
   const [isThinking, setIsThinking] = useState(false);
-  const [thinkingStatus, setThinkingStatus] = useState('Thinking...');
-
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 'welcome-1',
-      sender: 'assistant',
-      text: 'Hello! I am your AI Appointment Assistant. How can I help you today? You can ask me to book a consultation, check doctor availability, or find our clinic timings.',
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const streamRef = useRef<HTMLDivElement>(null);
@@ -176,19 +142,6 @@ export function PatientChatPage() {
       .then((data: ClinicInfo | null) => {
         if (data) {
           setClinic(data);
-          setMessages((prev) => {
-            if (prev.length === 1 && prev[0].id === 'welcome-1') {
-              return [
-                {
-                  id: 'welcome-1',
-                  sender: 'assistant',
-                  text: `Hello! I am your AI Appointment Assistant for ${data.business.name}. How can I assist you with your booking today?`,
-                  timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                },
-              ];
-            }
-            return prev;
-          });
         }
       })
       .catch((err) => console.warn('Could not fetch clinic info:', err));
@@ -302,12 +255,6 @@ export function PatientChatPage() {
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
     setIsThinking(true);
-    setThinkingStatus('Processing your request...');
-
-    // Dynamic thinking statuses for high-tech feeling
-    const statusTimer = setTimeout(() => {
-      setThinkingStatus('Checking schedule availability...');
-    }, 900);
 
     try {
       const res = await fetch('/api/public/chat', {
@@ -325,7 +272,6 @@ export function PatientChatPage() {
       });
 
       const resData = await res.json();
-      clearTimeout(statusTimer);
 
       if (resData.data?.customer_id && !customerId) {
         setCustomerId(resData.data.customer_id);
@@ -347,7 +293,6 @@ export function PatientChatPage() {
 
       setMessages((prev) => [...prev, botMsg]);
     } catch {
-      clearTimeout(statusTimer);
       setMessages((prev) => [
         ...prev,
         {
@@ -366,7 +311,7 @@ export function PatientChatPage() {
 
   const handleRegisterFromChat = async (e: React.FormEvent) => {
     e.preventDefault();
-    const activeBizId = clinic?.business?.id || businessIdParam || (businesses[0]?.id ?? '');
+    const activeBizId = clinic?.business?.id || businessIdParam || '';
     if (!activeBizId) return;
     if (!modalName.trim() || !modalPhone.trim()) {
       setModalError('Please enter both your name and phone number.');
@@ -429,139 +374,51 @@ export function PatientChatPage() {
     }
   };
 
-  const handleResetChat = () => {
-    const newId = crypto.randomUUID();
-    setConversationId(newId);
-    sessionStorage.setItem(CONV_STORAGE_KEY, newId);
-    setMessages([
-      {
-        id: crypto.randomUUID(),
-        sender: 'assistant',
-        text: `Conversation restarted. How can I help you today?`,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      },
-    ]);
-  };
-
-  // Fetch available businesses for company selector
-  useEffect(() => {
-    fetch('/api/public/businesses')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (data?.businesses && Array.isArray(data.businesses)) {
-          setBusinesses(data.businesses);
-        }
-      })
-      .catch((err) => console.warn('Could not fetch businesses list:', err));
-  }, []);
-
-  const handleSwitchBusiness = (newBusinessId: string) => {
-    if (!newBusinessId || newBusinessId === (clinic?.business?.id || businessIdParam)) return;
-    setSearchParams({ business_id: newBusinessId });
-    const targetBiz = businesses.find((b) => b.id === newBusinessId);
-    const newConvId = crypto.randomUUID();
-    setConversationId(newConvId);
-    sessionStorage.setItem(CONV_STORAGE_KEY, newConvId);
-    setMessages([
-      {
-        id: crypto.randomUUID(),
-        sender: 'assistant',
-        text: `Switched clinic to ${targetBiz?.name || 'selected company'}. Hello! I am your AI Appointment Assistant for ${targetBiz?.name || 'our practice'}. How can I assist you with your booking today?`,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      },
-    ]);
-  };
-
   return (
     <div className={`ai-stage-canvas theme-${theme}`}>
       {/* Background ambient gradient lighting */}
       <div className="ai-stage-glow top" />
       <div className="ai-stage-glow bottom" />
 
-      {/* 1. Minimal Top Control Header (Only Assistant Status & Controls) */}
+      {/* 1. Executive Top Control Header */}
       <header className="ai-stage-header">
         <div className="ai-stage-brand">
           <div className="ai-stage-live-dot" />
           <span className="ai-stage-title">
-            {clinic?.business?.name ? `${clinic.business.name} Assistant` : 'CareSync AI Assistant'}
+            {clinic?.business?.name || 'Appointment Assistant'}
           </span>
-          <span className="ai-stage-badge">Public • No Login Required</span>
         </div>
 
-        {/* Company / Clinic Selector */}
-        {businesses.length > 0 && (
-          <div className="ai-stage-biz-selector" title="Select or switch company / clinic">
-            <Building2 size={13} className="ai-stage-biz-icon" />
-            <span className="ai-stage-biz-label">Company:</span>
-            <select
-              className="ai-stage-biz-dropdown"
-              value={clinic?.business?.id || businessIdParam || (businesses[0]?.id ?? '')}
-              onChange={(e) => handleSwitchBusiness(e.target.value)}
-              aria-label="Switch company or clinic"
-            >
-              {businesses.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}{b.city ? ` (${b.city})` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        {/* Customer Badge / Registration in Header */}
-        {customerName ? (
-          <div className="ai-stage-cust-chip" title={`Registered customer in database. ID: ${customerId}`}>
-            <UserCheck size={13} className="ai-stage-cust-chip-icon" />
-            <div className="ai-stage-cust-chip-info">
-              <span className="ai-stage-cust-chip-name">{customerName}</span>
-              {customerPhone && <span className="ai-stage-cust-chip-phone">({customerPhone})</span>}
-            </div>
-            <span className="ai-stage-cust-chip-tag">DB Linked</span>
-            <button
-              type="button"
-              className="ai-stage-cust-chip-edit"
-              onClick={() => {
-                setModalName(customerName);
-                setModalPhone(customerPhone);
-                setModalEmail(customerEmail);
-                setShowRegModal(true);
-              }}
-              title="Edit customer information"
-            >
-              Edit
-            </button>
-          </div>
-        ) : (
+        <div className="ai-stage-header-actions">
+          {/* User Profile / Update Details */}
           <button
             type="button"
-            className="ai-stage-cust-reg-btn"
+            className="ai-stage-user-profile-btn"
             onClick={() => {
-              setModalName('');
-              setModalPhone('');
-              setModalEmail('');
+              setModalName(customerName);
+              setModalPhone(customerPhone);
+              setModalEmail(customerEmail);
               setShowRegModal(true);
             }}
-            title="Register your details with this clinic in the database"
+            title="Click to view or edit your profile details"
           >
-            <UserPlus size={13} />
-            <span>Register as Customer</span>
+            <div className="ai-stage-user-avatar">
+              <User size={14} />
+            </div>
+            <div className="ai-stage-user-meta">
+              <strong className="ai-stage-user-name">
+                {customerName || 'Your Profile'}
+              </strong>
+              {customerPhone && (
+                <span className="ai-stage-user-sub">({customerPhone})</span>
+              )}
+            </div>
+            <span className="ai-stage-user-edit-label">
+              {customerName ? 'Edit Details' : 'Set Profile'}
+            </span>
           </button>
-        )}
 
-        <div className="ai-stage-header-actions">
-          {/* Link back to Portal Home */}
-          <Link to="/" className="ai-stage-nav-pill" title="Return to Portal Selection">
-            <Home size={13} />
-            <span>Portal Home</span>
-          </Link>
-
-          {/* Link to Company / Staff Portal */}
-          <Link to="/login" className="ai-stage-nav-pill company-pill" title="Company & Staff Sign In">
-            <Building2 size={13} />
-            <span>Company Portal</span>
-          </Link>
-
-          {/* Background Choice Switch (White / Dark) */}
+          {/* Theme Switcher (White / Dark) */}
           <div className="ai-stage-theme-switch" role="radiogroup" aria-label="Choose Background Color">
             <button
               type="button"
@@ -582,29 +439,59 @@ export function PatientChatPage() {
               <span>Dark</span>
             </button>
           </div>
-
-          <button
-            type="button"
-            className="ai-stage-icon-btn"
-            onClick={handleResetChat}
-            title="Start New Chat"
-            aria-label="New chat"
-          >
-            <RotateCcw size={15} />
-          </button>
         </div>
       </header>
 
       {/* 2. Main Conversational Stream */}
       <main className="ai-stage-body">
         <div className="ai-stage-stream" ref={streamRef}>
+          {messages.length === 0 && (
+            <div className="ai-stage-starter-hero">
+              <div className="ai-stage-starter-icon">
+                <Bot size={28} />
+              </div>
+              <h2 className="ai-stage-starter-title">
+                {clinic?.business?.name ? `Welcome to ${clinic.business.name}` : 'Welcome to CareSync Health'}
+              </h2>
+              <p className="ai-stage-starter-desc">
+                How can we help you today? Ask any questions or select a starter prompt below to begin your chat.
+              </p>
+              <div className="ai-stage-starter-prompts">
+                <button
+                  type="button"
+                  className="ai-stage-starter-prompt-btn"
+                  onClick={() => handleSendMessage('I would like to book an appointment')}
+                >
+                  <Calendar size={14} />
+                  <span>Book an appointment</span>
+                </button>
+                <button
+                  type="button"
+                  className="ai-stage-starter-prompt-btn"
+                  onClick={() => handleSendMessage('What are your available times this week?')}
+                >
+                  <Clock size={14} />
+                  <span>Available times</span>
+                </button>
+                <button
+                  type="button"
+                  className="ai-stage-starter-prompt-btn"
+                  onClick={() => handleSendMessage('What services and treatments do you offer?')}
+                >
+                  <Sparkles size={14} />
+                  <span>Clinic services</span>
+                </button>
+              </div>
+            </div>
+          )}
+
           {messages.map((m) => {
             const isUser = m.sender === 'user';
             return (
               <div key={m.id} className={`ai-stage-msg-row ${isUser ? 'user' : 'assistant'}`}>
                 {!isUser && (
-                  <div className="ai-stage-avatar-mini">
-                    <img src={agentImg} alt="AI Assistant" />
+                  <div className="ai-stage-avatar-mini" aria-label="Assistant">
+                    <Bot size={15} />
                   </div>
                 )}
 
@@ -700,67 +587,30 @@ export function PatientChatPage() {
             );
           })}
 
+          {/* Inline Assistant Typing Indicator */}
+          {isThinking && (
+            <div className="ai-stage-msg-row assistant">
+              <div className="ai-stage-avatar-mini" aria-label="Assistant">
+                <Bot size={15} />
+              </div>
+              <div className="ai-stage-bubble-wrap">
+                <div className="ai-stage-bubble assistant thinking">
+                  <div className="ai-stage-typing-indicator">
+                    <span />
+                    <span />
+                    <span />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div ref={messagesEndRef} />
         </div>
       </main>
 
-      {/* 3. Central Living AI Agent & Command Dock */}
+      {/* 3. Sleek Modern Chat Input Dock */}
       <footer className="ai-stage-dock">
-        {/* The 3D Living AI Agent Character above the chatbar */}
-        <div className={`ai-stage-agent-box ${isThinking ? 'thinking' : 'idle'}`}>
-          <div className="ai-stage-agent-stage">
-            {/* 3D Gyroscopic Rings */}
-            <div className="ai-stage-gyro-ring ring-one" />
-            <div className="ai-stage-gyro-ring ring-two" />
-            <div className="ai-stage-agent-aura" />
-            <div className="ai-stage-agent-shadow" />
-
-            {/* Living Agent Avatar */}
-            <img
-              src={agentImg}
-              alt="AI Assistant"
-              className={`ai-stage-agent-character ${isThinking ? 'pulsing' : ''}`}
-            />
-          </div>
-
-          {/* Cognitive HUD / Live status display */}
-          <div className="ai-stage-cognitive-hud">
-            {isThinking ? (
-              <div className="ai-stage-thinking-state">
-                <div className="ai-stage-wave-bars">
-                  <span className="wave-bar" />
-                  <span className="wave-bar" />
-                  <span className="wave-bar" />
-                  <span className="wave-bar" />
-                </div>
-                <span className="ai-stage-thinking-label">{thinkingStatus}</span>
-              </div>
-            ) : (
-              <div className="ai-stage-idle-state">
-                <span className="ai-stage-idle-indicator" />
-                <span className="ai-stage-idle-label">AI Assistant Ready</span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Quick Suggestion Action Chips */}
-        <div className="ai-stage-chips-row">
-          {QUICK_ACTIONS.map((action, i) => (
-            <button
-              key={i}
-              type="button"
-              className="ai-stage-chip"
-              onClick={() => handleSendMessage(action.prompt)}
-              disabled={isThinking}
-            >
-              <Sparkles size={12} color="#0284c7" />
-              <span>{action.label}</span>
-            </button>
-          ))}
-        </div>
-
-        {/* Modern Large Chat Input Bar */}
         <div className="ai-stage-input-container">
           <input
             ref={inputRef}
@@ -769,7 +619,7 @@ export function PatientChatPage() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Type your message to book or ask a question..."
+            placeholder="Type your message..."
             disabled={isThinking}
             autoFocus
           />
@@ -796,8 +646,8 @@ export function PatientChatPage() {
           <div className="ai-modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="ai-modal-header">
               <div className="ai-modal-title">
-                <UserCheck size={18} />
-                <span>Register with {clinic?.business?.name || 'Clinic'}</span>
+                <User size={18} />
+                <span>{customerName ? 'Update Your Profile' : 'Your Profile'}</span>
               </div>
               <button
                 type="button"
@@ -810,7 +660,7 @@ export function PatientChatPage() {
             </div>
 
             <p className="ai-modal-subtitle">
-              Store your customer relationship in the database. Your upcoming appointments and booking history will be linked to your profile.
+              Keep your contact details up to date for appointment bookings and confirmations.
             </p>
 
             <form onSubmit={handleRegisterFromChat} className="ai-modal-form">
@@ -875,10 +725,10 @@ export function PatientChatPage() {
                 <button
                   type="submit"
                   className="ai-modal-btn primary"
-                  disabled={modalLoading}
+                  disabled={modalLoading || !modalName.trim() || !modalPhone.trim()}
                 >
-                  <Sparkles size={15} />
-                  <span>{modalLoading ? 'Saving to Database...' : 'Save to Database'}</span>
+                  <User size={15} />
+                  <span>{modalLoading ? 'Saving...' : customerName ? 'Update Profile' : 'Save Details'}</span>
                 </button>
                 <button
                   type="button"

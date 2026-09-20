@@ -21,6 +21,8 @@ services:
       PGUSER: ${PGUSER:-umair}
       PGPASSWORD: ${PGPASSWORD:-postgres}
       BACKEND_API_KEY: ${BACKEND_API_KEY:-appt_dcef54701d6e66eba727d4061616c70be6f1a8a450234f09ba585470e931c891}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      N8N_WEBHOOK_URL: ${WEBHOOK_URL:-http://127.0.0.1:5678/}
       APP_URL: ${APP_URL:-http://localhost:5173}
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:5173}
       FRONTEND_ORIGINS: ${FRONTEND_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,http://localhost:4000,http://127.0.0.1:4000,http://localhost:5678,http://127.0.0.1:5678}

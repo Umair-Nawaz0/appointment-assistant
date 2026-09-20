@@ -278,6 +278,16 @@ async def public_chat(payload: PublicChatRequest, request: Request) -> dict[str,
     clean_email = payload.customer_email.strip() if payload.customer_email and payload.customer_email.strip() else None
 
     async with transaction() as connection:
+        # Validate that customer actually belongs to this business
+        if resolved_customer_id:
+            cust_exists = await connection.fetchval(
+                "SELECT 1 FROM customers WHERE business_id = $1 AND id = $2",
+                business_id,
+                resolved_customer_id,
+            )
+            if not cust_exists:
+                resolved_customer_id = None
+
         if not resolved_customer_id and (clean_phone or clean_email):
             cust_row = await connection.fetchrow(
                 """SELECT id, name, phone, email FROM customers
@@ -310,10 +320,13 @@ async def public_chat(payload: PublicChatRequest, request: Request) -> dict[str,
                     clean_email,
                 )
 
+        # Upsert conversation: ensure it is marked ACTIVE with closed_at = NULL so state can exist
         await connection.execute(
-            """INSERT INTO conversations (id, business_id, customer_id, status)
-               VALUES ($1, $2, $3, 'ACTIVE'::conversation_status)
+            """INSERT INTO conversations (id, business_id, customer_id, status, closed_at)
+               VALUES ($1, $2, $3, 'ACTIVE'::conversation_status, NULL)
                ON CONFLICT (id) DO UPDATE SET
+                   status = 'ACTIVE'::conversation_status,
+                   closed_at = NULL,
                    last_message_at = CURRENT_TIMESTAMP,
                    customer_id = COALESCE(conversations.customer_id, EXCLUDED.customer_id)""",
             conversation_id,
@@ -344,10 +357,11 @@ async def public_chat(payload: PublicChatRequest, request: Request) -> dict[str,
                 clean_msg,
             )
 
-    # 3. Attempt n8n Webhook forward (try workflow-specific path first, then generic)
+    # 3. Secure n8n Webhook forward (workflow-specific path first, then generic fallback)
+    n8n_base = settings.n8n_webhook_base_url
     n8n_urls = [
-        "http://127.0.0.1:5678/webhook/ApptAssistant01/webhook/chat",
-        "http://127.0.0.1:5678/webhook/chat",
+        f"{n8n_base}/webhook/ApptAssistant01/webhook/chat",
+        f"{n8n_base}/webhook/chat",
     ]
     n8n_response_data: dict[str, Any] | None = None
 
@@ -360,19 +374,31 @@ async def public_chat(payload: PublicChatRequest, request: Request) -> dict[str,
         "customer_phone": clean_phone,
         "customer_email": clean_email,
     }
+    n8n_headers = {
+        "Content-Type": "application/json",
+        "X-API-Key": settings.backend_api_key,
+    }
 
     try:
-        async with httpx.AsyncClient(timeout=25.0) as http_client:
+        async with httpx.AsyncClient(timeout=35.0) as http_client:
             for n8n_url in n8n_urls:
                 try:
-                    resp = await http_client.post(n8n_url, json=webhook_body)
+                    resp = await http_client.post(n8n_url, json=webhook_body, headers=n8n_headers)
                     if resp.status_code == 200:
                         n8n_response_data = resp.json()
                         break
-                except Exception:
+                    else:
+                        logger.warning(
+                            "n8n webhook call to %s returned %s: %s",
+                            n8n_url,
+                            resp.status_code,
+                            resp.text[:300],
+                        )
+                except Exception as inner_e:
+                    logger.warning("n8n webhook attempt to %s failed: %s", n8n_url, inner_e)
                     continue
     except Exception as e:
-        logger.warning("n8n webhook call failed, falling back to direct assistant engine: %s", e)
+        logger.warning("n8n webhook client error, falling back to direct assistant engine: %s", e)
 
     # 4. If n8n answered successfully and didn't fail with an LLM error
     if n8n_response_data and "reply" in n8n_response_data:
@@ -616,50 +642,114 @@ async def public_chat(payload: PublicChatRequest, request: Request) -> dict[str,
             "data": col_data,
         }
 
-    # Greetings
-    if any(greeting in normalized for greeting in ["hi", "hello", "hey", "salam", "morning", "afternoon", "evening"]):
-        reply = (
-            f"Hello! Welcome to {business['name']}. I'm your AI Medical Receptionist. "
-            "How can I assist you today? You can book an appointment, check available slots, "
-            "or ask for clinic hours and location."
-        )
-        action = "RESPOND"
-        workflow = "NO_CHANGE"
-        data: dict[str, Any] = {}
+    # Dynamic LLM fallback generation
+    recent_msg_rows = await fetch(
+        """SELECT sender::text, content FROM conversation_messages
+            WHERE business_id = $1 AND conversation_id = $2
+            ORDER BY sent_at DESC LIMIT 8""",
+        business_id,
+        conversation_id,
+    )
+    recent_history = list(reversed([dict(r) for r in recent_msg_rows]))
 
-    # Address / Location
-    elif any(kw in normalized for kw in ["address", "location", "where are you", "where is the clinic", "directions"]):
-        addr = f"{business['address']}, {business['city']}" if business['address'] else "our clinic"
-        reply = f"{business['name']} is located at {addr}."
-        action = "INFO"
-        workflow = "BUSINESS_INFORMATION"
-        data = {"address": addr}
+    hours_rows = await fetch(
+        "SELECT day_of_week::text, opens_at::text, closes_at::text FROM business_hours WHERE business_id = $1 ORDER BY day_of_week",
+        business_id,
+    )
+    hours_str = "; ".join(f"{h['day_of_week'].title()}: {h['opens_at'][:5]} - {h['closes_at'][:5]}" for h in hours_rows) if hours_rows else "Monday to Friday, 09:00 - 17:00"
 
-    # Business Hours
-    elif any(kw in normalized for kw in ["hours", "timings", "timing", "open", "close", "operating"]):
-        hours_rows = await fetch(
-            "SELECT day_of_week::text, opens_at::text, closes_at::text FROM business_hours WHERE business_id = $1 ORDER BY day_of_week",
-            business_id,
-        )
-        if hours_rows:
-            formatted = "; ".join(f"{h['day_of_week'].title()}: {h['opens_at'][:5]} - {h['closes_at'][:5]}" for h in hours_rows)
-            reply = f"Our standard clinic hours are: {formatted}."
+    settings_row = await fetchrow(
+        "SELECT booking_window_days, appointment_duration_minutes FROM business_settings WHERE business_id = $1",
+        business_id,
+    )
+    booking_window = settings_row["booking_window_days"] if settings_row else 30
+    min_notice = 60
+    allow_same_day = True
+    duration = settings_row["appointment_duration_minutes"] if settings_row else 30
+
+    reply = None
+    action = "RESPOND"
+    workflow = "NO_CHANGE"
+    data: dict[str, Any] = {}
+
+    gemini_key = getattr(settings, "gemini_api_key", None)
+    if gemini_key:
+        try:
+            industry = business.get("industry") or "General"
+            addr = f"{business.get('address') or ''}, {business.get('city') or ''}".strip(", ")
+            b_name = business.get("name", "our business")
+            tz = business.get("timezone", "UTC")
+
+            system_instruction = (
+                f"You are the courteous, highly professional, and natural AI assistant representing '{b_name}'.\n"
+                f"Industry: {industry}\n"
+                f"Location: {addr or 'Reception'}\n"
+                f"Timezone: {tz}\n"
+                f"Operating Hours: {hours_str}\n"
+                f"Scheduling Rules: Booking window is up to {booking_window} days in advance. "
+                f"Minimum notice is {min_notice} minutes. "
+                f"Same day booking is {'allowed' if allow_same_day else 'not allowed'}. "
+                f"Appointment duration is {duration} minutes.\n\n"
+                "CRITICAL INSTRUCTIONS:\n"
+                "- Speak completely naturally, politely, and dynamically. Never sound like a robotic script or questionnaire.\n"
+                "- Do NOT use canned or fixed messages.\n"
+                f"- You represent '{b_name}'. Do NOT refer to yourself as a medical receptionist unless the industry is explicitly Medical or Healthcare.\n"
+                "- If the user asks general questions or questions about booking policies, hours, or services, answer them directly, intelligently, and warmly based on the business rules and details above.\n"
+                "- If they express intent to schedule an appointment, kindly ask what date or time works best for them.\n"
+                "- Keep responses concise (1 to 3 conversational sentences)."
+            )
+
+            contents = []
+            for m in recent_history:
+                role = "user" if m.get("sender") == "CUSTOMER" else "model"
+                contents.append({"role": role, "parts": [{"text": m.get("content", "")}]})
+            contents.append({"role": "user", "parts": [{"text": clean_msg}]})
+
+            req_body = {
+                "system_instruction": {"parts": [{"text": system_instruction}]},
+                "contents": contents,
+                "generationConfig": {
+                    "temperature": 0.7,
+                    "maxOutputTokens": 300,
+                },
+            }
+
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={gemini_key}"
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                res = await client.post(url, json=req_body, headers={"Content-Type": "application/json"})
+                if res.status_code == 200:
+                    cand = res.json().get("candidates", [])
+                    if cand:
+                        gen_text = cand[0].get("content", {}).get("parts", [{}])[0].get("text", "").strip()
+                        if gen_text:
+                            reply = gen_text
+                else:
+                    logger.warning("Gemini direct generation returned %s: %s", res.status_code, res.text[:200])
+        except Exception as e:
+            logger.warning("Gemini direct generation error: %s", e)
+
+    # Dynamic fallback if Gemini key is not configured or direct call failed
+    if not reply:
+        b_name = business.get("name", "our business")
+        if any(greeting in normalized for greeting in ["hi", "hello", "hey", "salam", "morning", "afternoon", "evening"]):
+            reply = f"Hello! Welcome to {b_name}. How can I assist you today? Feel free to ask about our hours, location, or scheduling an appointment."
+            action = "RESPOND"
+            workflow = "NO_CHANGE"
+        elif any(kw in normalized for kw in ["address", "location", "where are you", "where is", "directions"]):
+            addr = f"{business.get('address') or ''}, {business.get('city') or ''}".strip(", ") or "our primary location"
+            reply = f"{b_name} is located at {addr}."
+            action = "INFO"
+            workflow = "BUSINESS_INFORMATION"
+            data = {"address": addr}
+        elif any(kw in normalized for kw in ["hours", "timings", "timing", "open", "close", "operating"]):
+            reply = f"Our standard operating hours are: {hours_str}."
+            action = "INFO"
+            workflow = "BUSINESS_INFORMATION"
+            data = {"hours": [dict(h) for h in hours_rows]}
         else:
-            reply = f"{business['name']} operates Monday to Friday, 09:00 to 17:00."
-        action = "INFO"
-        workflow = "BUSINESS_INFORMATION"
-        data = {"hours": [dict(h) for h in hours_rows]}
-
-    # Default friendly medical booking prompt
-    else:
-        reply = (
-            f"I'm here to help you schedule with {business['name']}. "
-            "Could you please tell me which date you would like to book your visit for? "
-            "(For example: tomorrow, next Monday, or a specific date like 2026-09-22)."
-        )
-        action = "RESPOND"
-        workflow = "WAITING_FOR_DATE"
-        data = {}
+            reply = f"Thank you for contacting {b_name}. How can I assist you with scheduling or any questions you have today?"
+            action = "RESPOND"
+            workflow = "NO_CHANGE"
 
     # Log fallback reply
     await execute(

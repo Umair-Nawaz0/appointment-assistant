@@ -84,15 +84,29 @@ async def validate_chat_session(
         raise AppError(403, "Business is not currently active.", "FORBIDDEN")
 
     async with transaction() as connection:
-        # Ensure conversation exists; if not found, create as active
+        # Validate that customer actually belongs to this business if provided
+        valid_customer_id = payload.customer_id
+        if valid_customer_id:
+            cust_exists = await connection.fetchval(
+                "SELECT 1 FROM customers WHERE business_id = $1 AND id = $2",
+                payload.business_id,
+                valid_customer_id,
+            )
+            if not cust_exists:
+                valid_customer_id = None
+
+        # Ensure conversation exists and is active; if closed, reopen so state can exist
         await connection.execute(
-            """INSERT INTO conversations (id, business_id, customer_id, status)
-               VALUES ($1, $2, $3, 'ACTIVE'::conversation_status)
+            """INSERT INTO conversations (id, business_id, customer_id, status, closed_at)
+               VALUES ($1, $2, $3, 'ACTIVE'::conversation_status, NULL)
                ON CONFLICT (id) DO UPDATE
-                   SET customer_id = COALESCE(conversations.customer_id, EXCLUDED.customer_id)""",
+                   SET status = 'ACTIVE'::conversation_status,
+                       closed_at = NULL,
+                       customer_id = COALESCE(conversations.customer_id, EXCLUDED.customer_id),
+                       last_message_at = CURRENT_TIMESTAMP""",
             payload.conversation_id,
             payload.business_id,
-            payload.customer_id,
+            valid_customer_id,
         )
         await connection.execute(
             """INSERT INTO conversation_state (conversation_id, business_id)
