@@ -41,7 +41,7 @@ class Settings:
     session_ttl_days: int = _int("SESSION_TTL_DAYS", 7)
     verification_ttl_minutes: int = _int("EMAIL_VERIFICATION_CODE_TTL_MINUTES", 15)
     reset_ttl_minutes: int = _int("PASSWORD_RESET_TTL_MINUTES", 60)
-    mail_mode: str = os.getenv("MAIL_MODE", "console")
+    mail_mode: str = os.getenv("MAIL_MODE", "smtp" if (os.getenv("SMTP_USER") or os.getenv("GMAIL_SENDER_EMAIL")) else "console")
     mail_from: str = os.getenv("MAIL_FROM", "Appointment Assistant <no-reply@example.com>")
     smtp_host: str | None = os.getenv("SMTP_HOST") or None
     smtp_port: int = _int("SMTP_PORT", 587)
@@ -53,6 +53,7 @@ class Settings:
     # Gmail Integration Settings
     gmail_sender_email: str | None = os.getenv("GMAIL_SENDER_EMAIL") or os.getenv("GMAIL_USER") or None
     gmail_api_secret_key: str | None = os.getenv("GMAIL_API_SECRET_KEY") or os.getenv("GMAIL_APP_PASSWORD") or None
+    gmail_app_password: str | None = os.getenv("GMAIL_APP_PASSWORD") or os.getenv("GMAIL_API_SECRET_KEY") or None
     gmail_client_id: str | None = os.getenv("GMAIL_CLIENT_ID") or None
     gmail_client_secret: str | None = os.getenv("GMAIL_CLIENT_SECRET") or None
     gmail_refresh_token: str | None = os.getenv("GMAIL_REFRESH_TOKEN") or None

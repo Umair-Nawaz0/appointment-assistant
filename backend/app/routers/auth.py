@@ -125,13 +125,10 @@ async def signup(payload: Signup) -> dict[str, object]:
         await connection.execute("INSERT INTO business_settings (business_id) VALUES ($1)", business["id"])
     code = await _issue_code(business["id"], "EMAIL_VERIFICATION")
     await send_verification(email, business["name"], code)
-    result: dict[str, object] = {
+    return {
         "message": "Workspace created. Enter the code sent to your business email.",
         "email": email,
     }
-    if not settings.production and settings.mail_mode == "console":
-        result["devCode"] = code
-    return result
 
 
 @router.post("/verify-email")
@@ -171,8 +168,6 @@ async def resend(payload: EmailInput) -> dict[str, object]:
     if business:
         code = await _issue_code(business["id"], "EMAIL_VERIFICATION")
         await send_verification(email, business["name"], code)
-        if not settings.production and settings.mail_mode == "console":
-            result["devCode"] = code
     return result
 
 
@@ -219,8 +214,6 @@ async def forgot(payload: EmailInput) -> dict[str, object]:
     if business:
         code = await _issue_code(business["id"], "PASSWORD_RESET")
         await send_password_reset(email, business["name"], code)
-        if not settings.production and settings.mail_mode == "console":
-            result["devCode"] = code
     return result
 
 
